@@ -2,15 +2,17 @@
 
 ## What This Is
 
-A semester-long design and fabrication project at IAAC (MRAC + MAAI, 2025/2026).
-The goal is to design and build a **modular assembly system** where the human body,
-gestures, and decisions become the logic that drives a projection-mapped fabrication process.
-No touchscreens — the interface IS the physical space.
+A semester-long interactive installation project at IAAC (MRAC + MAAI, 2025/2026).
+A physical scale replica (building or object) is placed on a table. A projector maps
+directly onto the 3D surface of the model, revealing layered content: CO₂ emissions,
+material provenance, and critical historical facts — accompanied by spatial sound.
+Camera/Kinect detects object placement and orientation; the human interaction (placing,
+rotating, approaching) drives the FSM that controls what information layer is shown.
 
 ## Core Value
 
-A working interactive prototype where projection-mapped light guides a human through
-assembling a physical modular structure — the system validates each step in real time.
+A physical replica becomes a data interface: place the model, and the building/object
+tells its own critical story through light and sound projected directly onto it.
 
 ## Requirements
 
@@ -52,7 +54,15 @@ TouchDesigner/HeavyM (projection), Arduino/ESP32 (physical sensors), USB webcam 
 **Key theoretical reference:** Stefana Parascho, "Cooperative Robotic Assembly" (ETH Diss. 25839)
 — assembly sequence as FSM, each intermediate state must be structurally valid
 
-**Project module concept:** TBD (to be defined before S1 deliverable, April 17)
+**Project concept (confirmed April 10):**
+- Physisches Replica (Gebäude oder Objekt als Maßstabsmodell) wird auf Tisch platziert
+- Projektor mappt direkt auf die 3D-Oberfläche des Modells (kein flacher Screen)
+- Inhalt-Schichten: CO₂-Emissionen, Materialherkunft, kritische historische Fakten
+- Ton/Sound als Ebene: industrielle Geräusche, historische Audio-Fragmente, Umgebungsklang
+- Kamera (overhead) + ggf. Kinect erkennt Platzierung und Orientierung des Modells
+- ESP32 + Sensor für zusätzliche Interaktion (Proximity, Rotation, Touch)
+- FSM-Logik: jeder State = eine Informationsschicht (IDLE → PLACED → CO2 → HISTORY → ORIGIN → COMPLETE)
+- Hintergrund: Ausstellungsbau — Installation vermittelt kritischen Inhalt, nicht nur visuelle Aktivität
 
 ## Constraints
 

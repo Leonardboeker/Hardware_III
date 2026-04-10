@@ -7,12 +7,12 @@
 
 ## Phase 1 — S1 Proposal & FSM Foundation
 **Deadline:** Before April 17 (Session 2)
-**Goal:** Submit all S1 deliverables and define the project concept clearly enough to build on.
+**Goal:** Submit all S1 deliverables. Concept is locked: physical replica + projection mapping + layered data (CO₂, provenance, history) + sound.
 
 **Delivers:**
-- Project proposal document (module type, connection logic, input method, feedback strategy)
+- Project proposal document: replica as input object, camera/Kinect detection, projection-on-model, FSM-driven content layers, sound
 - Project management schedule (Gantt/Kanban covering S1–S7, roles and tasks)
-- First FSM diagram on paper (3–5 states, labeled transitions)
+- First FSM diagram on paper: IDLE → PLACED → SCANNING → [CO2 / HISTORY / ORIGIN] → COMPLETE
 - Embodied interaction observation (photo/sketch of non-touchscreen interaction)
 
 **Requirements:** S1-01, S1-02, S1-03, S1-04
