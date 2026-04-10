@@ -1,0 +1,14 @@
+{
+  "project": "Hardware III — Human-in-the-Loop Interactive Systems",
+  "created": "2026-04-10",
+  "workflow": {
+    "research": false,
+    "auto_commit": true,
+    "model_profile": "balanced"
+  },
+  "git": {
+    "remote": "https://github.com/Leonardboeker/Hardware_III.git",
+    "branch": "master",
+    "auto_push": false
+  }
+}
