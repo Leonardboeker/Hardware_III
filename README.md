@@ -4,6 +4,7 @@
 **Institute:** IAAC, MRAC + MAAI 2025/2026
 **Instructors:** Hamid Peiro, Aleksandra Kraeva
 **Schedule:** April 10 – May 22, 2026
+**Team:** Leo, Elais, Rafik, Seid, Onur, Nithik
 
 ---
 
