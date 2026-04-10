@@ -28,7 +28,15 @@ See: `.planning/PROJECT.md` (updated 2026-04-10)
 
 Run `/gsd:plan-phase 1` to create a detailed plan for the S1 deliverables.
 
-**Critical:** Project concept (module type) still TBD — must be decided before proposal submission.
+**Concept locked (April 10):**
+Guided comparative assembly installation — user builds 2–4 construction method models
+step-by-step on a table. Projection guides placement + reveals CO₂/labor data per piece.
+Final comparison statistics after all models complete.
+
+**Still open for Phase 1:**
+- Which 2–4 construction methods to compare (traditional, 3D-print, modular, vernacular?)
+- Which building type (house, pavilion, wall section?)
+- Team composition + role split
 
 ## Notes
 
