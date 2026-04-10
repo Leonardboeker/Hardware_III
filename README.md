@@ -7,6 +7,10 @@
 
 ---
 
+## Mission
+
+> "We compare different statistics of the housing construction industry and display them through an interactive exhibit."
+
 ## Concept
 
 An interactive table installation where the user physically assembles 2–3 scale models of the same object — each built using a different construction method (e.g. traditional masonry, 3D-printed concrete, modular prefabrication).
