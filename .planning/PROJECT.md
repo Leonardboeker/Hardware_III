@@ -34,7 +34,7 @@ you *build* the comparison yourself, piece by piece — the statistics emerge fr
 - Traditional masonry / site-built
 - 3D-printed concrete / robotic extrusion
 - Modular prefabrication / CLT
-- (Optional) Adobe / earthen / vernacular
+- (Strong candidate) Reclaimed / reused brick — near-zero embodied carbon, outperforms 3DP on every metric, sharpens the political argument
 
 ## FSM States
 
@@ -101,6 +101,16 @@ COMPARISON (all models complete)
 **Key theoretical reference:** Stefana Parascho, "Cooperative Robotic Assembly" (ETH Diss. 25839)
 — assembly sequence as FSM, each intermediate state must be valid → directly maps to guided piece placement
 
+**Reference projects (from S1 review):**
+- Gramazio Kohler, Augmented Bricklaying, ETH 2018–20 — direct precedent for AR-guided assembly
+- Fologram, Steampunk Pavilion, Tallinn 2019 — guided assembly proven with public
+- MIT Tangible Media, inFORM, 2013 — canonical tangible dataviz reference
+- EPFL SXL, Corentin Fivet — reuse + embodied carbon as design driver
+- Striatus Bridge (ZHA + BRG + ETH, 2021) — 3DP concrete visual reference
+- Domestic Data Streamers — participatory physical dataviz
+
+**White space:** No precedent exists for a tabletop interactive LCA comparison installation combining guided assembly + tangible dataviz + LCA at table scale.
+
 ## Constraints
 
 - **Timeline:** S1 proposal due April 17 — concept locked, execution starts
@@ -117,8 +127,21 @@ COMPARISON (all models complete)
 | Comparative structure (2–4 models) | Makes data tangible through contrast | — Pending |
 | Guided assembly (not free exploration) | Matches course requirement: FSM + human-in-the-loop | — Pending |
 | Table projection (top-down) | Easier calibration, direct piece-to-data feedback | — Pending |
-| Color/marker-tagged pieces | Reliable detection without complex CV | — Pending |
+| ArUco fiducial markers on pieces | Color detection unreliable under projector light | — Pending (recommended over color) |
 | Sound as equal layer to visuals | Ausstellungsbau background — content depth matters | — Pending |
+| Runtime: TouchDesigner vs GH/Anemone | GH is single-threaded; Anemone stalls canvas; webcam under projector light is fragile — TD does projection mapping + CV natively | — **Open — needs team decision** |
+| Build all 3 methods physically vs. 1 physical + 2 animated | 3 full builds = visitor fatigue risk | — **Open — needs team decision** |
+| LCA data as ranges (with sources) vs. single figures | Single EPD figures vary wildly and collapse under expert questioning | — **Open** |
+
+## Open Critiques (from S1 peer review — address in proposal)
+
+1. Three full builds may exhaust visitors — consider 1 physical + 2 projected animations
+2. LCA numbers must be ranges with cited sources, not single figures
+3. Labor-hours mapping is symbolic, not embodied — own that framing explicitly
+4. Missing political dimension: who loses jobs in each method?
+5. Reused/reclaimed brick as a 4th method is the strongest narrative upgrade available
+
+See `.planning/REVIEW-S1.md` for full critique, additions, and references.
 
 ---
-*Last updated: 2026-04-10 — concept finalized in conversation*
+*Last updated: 2026-04-13 — S1 peer review integrated*
