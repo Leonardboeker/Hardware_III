@@ -1,14 +1,12 @@
-# Hardware III — Comparative Construction: Guided Assembly Installation
+# Hardware III — Guided Comparative Assembly
+
+**Subtitle:** An interactive construction kitchen — configure, build, compare.
+**Proposal submitted:** April 17, 2026 (`Group_3_Hardware_III_Proposal.pdf`)
 
 ## What This Is
 
-An interactive table installation at IAAC (MRAC + MAAI, 2025/2026).
-The user assembles 2–4 physical scale models of the same building/object,
-each representing a different construction method (traditional, 3D-printed, modular prefab, etc.).
-A projector guides each placement step and reveals real data at every piece:
-CO₂ consumption, labor hours, construction time, and method explanation.
-After all models are complete, a comparative statistics view is projected — making
-the environmental and economic differences tangible and visceral.
+A hands-on exhibit for children, young architects, and decision makers.
+The user configures a building (footprint, height, material) using physical ArUco pucks and dials on a table. A projector guides them through 5 construction phases — each with CO₂, cost, labor, and logistics data. Three construction methods can be compared: Masonry, 3D Printed, Prefab. No screens. No buttons.
 
 ## Core Value
 
@@ -36,38 +34,30 @@ you *build* the comparison yourself, piece by piece — the statistics emerge fr
 - Modular prefabrication / CLT
 - (Strong candidate) Reclaimed / reused brick — near-zero embodied carbon, outperforms 3DP on every metric, sharpens the political argument
 
-## FSM States
+## FSM States (locked in proposal)
 
 ```
-IDLE
-  → Object detected in zone → GUIDING
-
-GUIDING
-  → Piece placed correctly → CHECKING
-
-CHECKING (0.3s validation)
-  → Valid → CONFIRMED
-  → Invalid → ERROR (show ghost of correct position)
-
-CONFIRMED
-  → Show data layer (CO₂, hours, method)
-  → Timer / user lifts hand → NEXT_PIECE
-  → If last piece → MODEL_COMPLETE
-
-NEXT_PIECE
-  → Highlight next piece → GUIDING
-
-MODEL_COMPLETE
-  → Show model summary
-  → User picks up next model set → NEXT_MODEL
-
-NEXT_MODEL
-  → Reset projection for new method → GUIDING
-
-COMPARISON (all models complete)
-  → Full statistics projected
-  → Loop / reset after timeout → IDLE
+IDLE → METHOD → FOOTPRINT → HEIGHT → MATERIALS → VALIDATED → 5 PHASES → COMPARISON
 ```
+
+- **IDLE**: No model on pedestal
+- **METHOD**: RFID read → construction method selected (Masonry / 3D Printed / Prefab)
+- **FOOTPRINT**: User arranges 10 ArUco pucks → footprint + m² calculated
+- **HEIGHT**: User rotates ArUco dial (ID 10) → floors selected
+- **MATERIALS**: User rotates ArUco dial (ID 11) → material variant selected
+- **VALIDATED**: System checks feasibility (e.g. earth 3DP max 1 story) → green/red feedback
+- **5 PHASES**: Foundation → Structure → Roof → Openings → Finishing (animated, data per phase)
+- **COMPARISON**: All data saved, side-by-side dashboard projected
+
+## Building Phases (locked)
+
+| Phase | Name |
+|-------|------|
+| 1 | Foundation |
+| 2 | Structure / Walls |
+| 3 | Roof |
+| 4 | Openings (windows/doors) |
+| 5 | Finishing |
 
 ## Input / Sensing
 
@@ -144,4 +134,4 @@ COMPARISON (all models complete)
 See `.planning/REVIEW-S1.md` for full critique, additions, and references.
 
 ---
-*Last updated: 2026-04-13 — S1 peer review integrated*
+*Last updated: 2026-04-17 — proposal submitted, FSM + phases locked*
