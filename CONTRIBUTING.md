@@ -4,6 +4,19 @@ Six of us, one repo, ~3 weeks. Here's how we keep it from becoming chaos.
 
 ---
 
+## Locked project decisions
+
+These positions are taken. Backing rationale + lit-review citations live in `docs/research/lit-review/ACTIONS.md`. If you want to change one of these, propose it in a meeting and we update both files in the same commit — don't quietly drift.
+
+1. **Closed-loop computer vision from day one.** Every FSM transition is gated by camera confirmation against a projected target. No "press a button to advance" baseline. A keyboard manual-override hotkey exists only as emergency demo-day insurance, not as a runtime mode.
+2. **Reclaimed brick is a baseline toggle, not a fourth competitor.** Framing: "every method is measured against this reuse-based floor."
+3. **Methodology-wobble is a first-class projection layer.** A toggleable overlay that shows how LCA numbers swing with system boundary, lifespan, biogenic carbon, and grid mix. This is the project's pedagogical contribution, not a footnote.
+4. **AI-generated phase animations are paused** until tier-1 LCA numbers are sourced (Catalonia: CYPE / BEDEC / ITeC / EPDs).
+
+Date locked: 2026-05-03.
+
+---
+
 ## Folder ownership
 
 Each top-level folder has one **primary** (final say, merges PRs touching it) and any number of contributors. Fill in your name when you claim a slot.
@@ -18,14 +31,14 @@ Each top-level folder has one **primary** (final say, merges PRs touching it) an
 | `data/` (LCA datasets) | _TBD_ | |
 | `docs/` | shared | everyone |
 
-**Rule:** never push directly to `main`. Always branch + PR. The folder primary reviews.
+**Rule:** never push directly to `master`. Always branch + PR. The folder primary reviews.
 
 ---
 
 ## Branching
 
-- `main` is always working / demo-able.
-- Branch off `main` for any change. Name pattern: `<initials>/<short-topic>` — e.g., `rk/aruco-tracking`, `lb/rfid-pedestal`.
+- `master` is always working / demo-able.
+- Branch off `master` for any change. Name pattern: `<initials>/<short-topic>` — e.g., `rk/aruco-tracking`, `lb/rfid-pedestal`.
 - Merge via PR. At least one reviewer (the folder primary) approves before merge.
 - Delete branches after merging.
 
