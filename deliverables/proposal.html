@@ -1,0 +1,796 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Guided Comparative Assembly — Hardware III</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Caveat:wght@400;500;600;700&family=Quicksand:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --paper: #FAFAF8;
+    --ink: #1A1A1A;
+    --pencil: #4A4A4A;
+    --light-pencil: #9A9A9A;
+    --sketch-line: #C8C8C8;
+    --highlight: #E8E8E0;
+    --accent-red: #CC3333;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--paper);
+    color: var(--ink);
+    font-family: 'Quicksand', sans-serif;
+    font-weight: 400;
+    overflow-x: hidden;
+  }
+
+  /* Paper texture overlay */
+  body::before {
+    content: '';
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background-image:
+      radial-gradient(circle at 20% 50%, rgba(0,0,0,0.01) 0%, transparent 50%),
+      radial-gradient(circle at 80% 20%, rgba(0,0,0,0.015) 0%, transparent 50%);
+    pointer-events: none;
+    z-index: 1000;
+  }
+
+  /* ─── SLIDE CONTAINER ─── */
+  .slide {
+    width: 100vw;
+    min-height: 100vh;
+    padding: 5vh 8vw;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    border-bottom: 2px dashed var(--sketch-line);
+    page-break-after: always;
+  }
+
+  .slide::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 60px; right: 60px; bottom: 0;
+    border-left: 1px solid rgba(200, 180, 180, 0.3);
+    border-right: 1px solid rgba(200, 180, 180, 0.3);
+    pointer-events: none;
+  }
+
+  /* Notebook holes */
+  .slide::after {
+    content: '';
+    position: absolute;
+    left: 35px;
+    top: 15%;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: var(--paper);
+    border: 2px solid var(--sketch-line);
+    box-shadow:
+      0 calc(100vh * 0.25) 0 -1px var(--paper),
+      0 calc(100vh * 0.25) 0 0 var(--sketch-line),
+      0 calc(100vh * 0.5) 0 -1px var(--paper),
+      0 calc(100vh * 0.5) 0 0 var(--sketch-line);
+    pointer-events: none;
+  }
+
+  /* ─── TYPOGRAPHY ─── */
+  h1 {
+    font-family: 'Caveat', cursive;
+    font-size: clamp(3rem, 7vw, 6rem);
+    font-weight: 700;
+    line-height: 1.05;
+    color: var(--ink);
+    transform: rotate(-1deg);
+    margin-bottom: 0.5rem;
+  }
+
+  h2 {
+    font-family: 'Caveat', cursive;
+    font-size: clamp(1.8rem, 4vw, 3.2rem);
+    font-weight: 600;
+    color: var(--ink);
+    margin-bottom: 1rem;
+    transform: rotate(-0.5deg);
+    position: relative;
+    display: inline-block;
+  }
+
+  h2::after {
+    content: '';
+    position: absolute;
+    bottom: -2px;
+    left: -5px;
+    right: -5px;
+    height: 3px;
+    background: var(--ink);
+    transform: rotate(-0.3deg);
+    border-radius: 2px;
+  }
+
+  h3 {
+    font-family: 'Caveat', cursive;
+    font-size: clamp(1.4rem, 3vw, 2.2rem);
+    font-weight: 600;
+    color: var(--pencil);
+    margin-bottom: 0.6rem;
+  }
+
+  p, li {
+    font-size: clamp(0.95rem, 1.5vw, 1.15rem);
+    line-height: 1.7;
+    color: var(--pencil);
+    font-weight: 400;
+  }
+
+  .subtitle {
+    font-family: 'Quicksand', sans-serif;
+    font-size: clamp(1rem, 2vw, 1.4rem);
+    color: var(--light-pencil);
+    font-weight: 300;
+    margin-bottom: 2rem;
+    transform: rotate(-0.3deg);
+  }
+
+  .team {
+    font-family: 'Caveat', cursive;
+    font-size: 1.1rem;
+    color: var(--light-pencil);
+    margin-top: 1.5rem;
+    letter-spacing: 0.03em;
+  }
+
+  /* ─── SLIDE NUMBER ─── */
+  .slide-num {
+    position: absolute;
+    top: 3vh;
+    right: 5vw;
+    font-family: 'Caveat', cursive;
+    font-size: 5rem;
+    font-weight: 700;
+    color: rgba(26, 26, 26, 0.06);
+    line-height: 1;
+  }
+
+  /* ─── SKETCH BOXES ─── */
+  .sketch-box {
+    border: 2px solid var(--ink);
+    border-radius: 3px;
+    padding: 1.5rem 2rem;
+    margin: 1rem 0;
+    position: relative;
+    background: transparent;
+    transform: rotate(-0.2deg);
+  }
+
+  .sketch-box::before {
+    content: '';
+    position: absolute;
+    top: 3px; left: 3px; right: -3px; bottom: -3px;
+    border: 1px solid var(--sketch-line);
+    border-radius: 3px;
+    z-index: -1;
+  }
+
+  .sketch-box.dashed {
+    border-style: dashed;
+    border-width: 1.5px;
+    border-color: var(--pencil);
+  }
+
+  .sketch-box.highlight {
+    background: var(--highlight);
+    border-color: var(--pencil);
+  }
+
+  .label {
+    font-family: 'Caveat', cursive;
+    font-size: 0.85rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.15em;
+    color: var(--ink);
+    background: var(--paper);
+    position: absolute;
+    top: -10px;
+    left: 15px;
+    padding: 0 8px;
+  }
+
+  /* ─── GRID ─── */
+  .grid-2 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 2rem;
+    margin: 1.5rem 0;
+  }
+
+  .grid-3 {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1.5rem;
+    margin: 1.5rem 0;
+  }
+
+  /* ─── METHOD CARDS ─── */
+  .method-card {
+    border: 2px solid var(--ink);
+    padding: 1.5rem;
+    text-align: center;
+    position: relative;
+    background: transparent;
+  }
+
+  .method-card:nth-child(1) { transform: rotate(-1deg); }
+  .method-card:nth-child(2) { transform: rotate(0.5deg); }
+  .method-card:nth-child(3) { transform: rotate(-0.7deg); }
+
+  .method-card h3 {
+    font-size: 1.6rem;
+    margin-bottom: 0.3rem;
+    color: var(--ink);
+  }
+
+  .method-card .method-sub {
+    font-family: 'Quicksand', sans-serif;
+    font-size: 0.85rem;
+    color: var(--light-pencil);
+  }
+
+  /* ─── FLOW STEPS ─── */
+  .flow {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin: 2rem 0;
+    flex-wrap: wrap;
+  }
+
+  .flow-step {
+    border: 1.5px solid var(--ink);
+    border-radius: 3px;
+    padding: 0.8rem 1.2rem;
+    text-align: center;
+    min-width: 120px;
+    background: transparent;
+  }
+
+  .flow-step .num {
+    font-family: 'Caveat', cursive;
+    font-size: 1.8rem;
+    font-weight: 700;
+    line-height: 1;
+    color: var(--ink);
+  }
+
+  .flow-step .desc {
+    font-size: 0.8rem;
+    color: var(--pencil);
+    margin-top: 0.3rem;
+  }
+
+  .flow-arrow {
+    font-family: 'Caveat', cursive;
+    font-size: 1.8rem;
+    color: var(--light-pencil);
+    user-select: none;
+  }
+
+  /* ─── FSM ─── */
+  .fsm-container {
+    margin: 1.5rem 0;
+    position: relative;
+  }
+
+  .fsm-row {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin: 0.8rem 0;
+    flex-wrap: wrap;
+  }
+
+  .fsm-state {
+    border: 2px solid var(--ink);
+    padding: 0.7rem 1.2rem;
+    font-family: 'Caveat', cursive;
+    font-size: 1.1rem;
+    font-weight: 700;
+    min-width: 100px;
+    text-align: center;
+    position: relative;
+    background: var(--paper);
+  }
+
+  .fsm-state.active {
+    background: var(--ink);
+    color: var(--paper);
+  }
+
+  .fsm-state.error {
+    border-color: var(--accent-red);
+    color: var(--accent-red);
+  }
+
+  .fsm-state.complete {
+    border-width: 3px;
+  }
+
+  .fsm-arrow {
+    font-family: 'Caveat', cursive;
+    font-size: 1rem;
+    color: var(--light-pencil);
+  }
+
+  .fsm-label {
+    font-family: 'Quicksand', sans-serif;
+    font-size: 0.7rem;
+    color: var(--light-pencil);
+    display: block;
+    text-align: center;
+  }
+
+  /* ─── TECH STACK TABLE ─── */
+  .tech-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 1rem 0;
+  }
+
+  .tech-table td {
+    padding: 0.6rem 1rem;
+    border-bottom: 1px dashed var(--sketch-line);
+    vertical-align: top;
+  }
+
+  .tech-table td:first-child {
+    font-family: 'Caveat', cursive;
+    font-weight: 700;
+    font-size: 1.1rem;
+    width: 40%;
+    color: var(--ink);
+  }
+
+  .tech-table td:last-child {
+    font-size: 0.9rem;
+    color: var(--pencil);
+  }
+
+  /* ─── TIMELINE ─── */
+  .timeline {
+    display: flex;
+    gap: 0;
+    margin: 2rem 0;
+    position: relative;
+  }
+
+  .timeline::before {
+    content: '';
+    position: absolute;
+    top: 30px;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: var(--ink);
+    z-index: 0;
+  }
+
+  .phase {
+    flex: 1;
+    text-align: center;
+    position: relative;
+    padding: 0 0.3rem;
+  }
+
+  .phase-dot {
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    border: 2px solid var(--ink);
+    background: var(--paper);
+    margin: 23px auto 0.6rem;
+    position: relative;
+    z-index: 1;
+  }
+
+  .phase:first-child .phase-dot {
+    background: var(--ink);
+  }
+
+  .phase-label {
+    font-family: 'Caveat', cursive;
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: var(--ink);
+  }
+
+  .phase-desc {
+    font-size: 0.72rem;
+    color: var(--light-pencil);
+    margin-top: 0.2rem;
+    line-height: 1.4;
+  }
+
+  .phase-date {
+    font-family: 'Caveat', cursive;
+    font-size: 0.8rem;
+    color: var(--light-pencil);
+    margin-top: 0.2rem;
+  }
+
+  /* ─── ANNOTATIONS ─── */
+  .annotation {
+    font-family: 'Caveat', cursive;
+    font-size: 1rem;
+    color: var(--accent-red);
+    transform: rotate(-2deg);
+    display: inline-block;
+    margin: 0.5rem 0;
+  }
+
+  .circle-text {
+    border: 2px solid var(--ink);
+    border-radius: 50%;
+    width: 2.5rem;
+    height: 2.5rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'Caveat', cursive;
+    font-weight: 700;
+    font-size: 1.2rem;
+  }
+
+  /* ─── DIVIDER ─── */
+  .divider {
+    border: none;
+    border-top: 1.5px dashed var(--sketch-line);
+    margin: 2rem 0;
+  }
+
+  /* ─── REFERENCE ─── */
+  .ref {
+    font-size: 0.85rem;
+    color: var(--light-pencil);
+    font-style: italic;
+    margin: 0.5rem 0;
+    padding-left: 1rem;
+    border-left: 2px solid var(--sketch-line);
+  }
+
+  /* ─── FOOTER ─── */
+  .slide-footer {
+    position: absolute;
+    bottom: 2vh;
+    left: 8vw;
+    right: 8vw;
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.75rem;
+    color: var(--light-pencil);
+    font-family: 'Quicksand', sans-serif;
+  }
+
+  /* ─── PRINT ─── */
+  @media print {
+    .slide {
+      height: 100vh;
+      page-break-after: always;
+      border-bottom: none;
+    }
+  }
+
+  @media (max-width: 768px) {
+    .grid-2, .grid-3 { grid-template-columns: 1fr; }
+    .flow { flex-direction: column; align-items: stretch; }
+    .flow-arrow { transform: rotate(90deg); text-align: center; }
+    .timeline { flex-wrap: wrap; }
+    .timeline::before { display: none; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════ -->
+<!-- SLIDE 1: CONCEPT & INTERACTION FLOW    -->
+<!-- ═══════════════════════════════════════ -->
+<section class="slide">
+  <span class="slide-num">01</span>
+
+  <h1>Guided Comparative<br>Assembly</h1>
+  <p class="subtitle">An interactive construction kitchen — configure, build, compare</p>
+
+  <div class="sketch-box highlight" style="max-width: 640px;">
+    <span class="label">Mission</span>
+    <p style="font-size: 1.05rem; line-height: 1.8;">
+      We compare different statistics of the housing construction industry
+      and display them through an <strong>interactive exhibit</strong> — a hands-on learning
+      experience for children, young architects, and decision makers.
+    </p>
+  </div>
+
+  <div class="grid-3" style="margin-top: 1.5rem;">
+    <div class="method-card">
+      <h3>Masonry</h3>
+      <p class="method-sub">brick by brick</p>
+      <p class="method-sub" style="margin-top: 0.3rem; font-style: italic;">brick or stone</p>
+    </div>
+    <div class="method-card">
+      <h3>3D Printed</h3>
+      <p class="method-sub">layer by layer</p>
+      <p class="method-sub" style="margin-top: 0.3rem; font-style: italic;">earth or concrete</p>
+    </div>
+    <div class="method-card">
+      <h3>Prefab</h3>
+      <p class="method-sub">module by module</p>
+      <p class="method-sub" style="margin-top: 0.3rem; font-style: italic;">factory grid</p>
+    </div>
+  </div>
+
+  <p class="annotation" style="margin-top: 1.5rem;">↓ the user configures everything with physical objects — no screens, no buttons</p>
+
+  <h3 style="margin-top: 1.5rem;">User Interaction Flow</h3>
+  <div class="flow">
+    <div class="flow-step"><span class="num">1</span><div class="desc">Place model on<br>RFID pedestal</div></div>
+    <span class="flow-arrow">→</span>
+    <div class="flow-step"><span class="num">2</span><div class="desc">Arrange 10 pucks<br>= building footprint</div></div>
+    <span class="flow-arrow">→</span>
+    <div class="flow-step"><span class="num">3</span><div class="desc">Set height<br>+ materials</div></div>
+    <span class="flow-arrow">→</span>
+    <div class="flow-step"><span class="num">4</span><div class="desc">System validates<br>feasibility</div></div>
+    <span class="flow-arrow">→</span>
+    <div class="flow-step"><span class="num">5</span><div class="desc">5 building phases<br>with animations</div></div>
+    <span class="flow-arrow">→</span>
+    <div class="flow-step"><span class="num">6</span><div class="desc">Save & compare<br>builds</div></div>
+  </div>
+
+  <div class="sketch-box dashed" style="margin-top: 1rem; max-width: 700px;">
+    <span class="label">The Point</span>
+    <p style="font-size: 0.95rem;">
+      Instead of reading abstract statistics, you <strong>configure your own building</strong>,
+      watch it get constructed phase by phase, and see the real environmental and economic cost.
+      Then build another one and compare. The data becomes physical.
+    </p>
+  </div>
+
+  <p class="team">Team: Leo · Elais · Rafik · Seid · Onur · Nithik</p>
+
+  <div class="slide-footer">
+    <span>Hardware III — IAAC MRAC+MAAI 2025/2026</span>
+    <span>1 / 3</span>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════ -->
+<!-- SLIDE 2: SYSTEM ARCHITECTURE & FSM     -->
+<!-- ═══════════════════════════════════════ -->
+<section class="slide">
+  <span class="slide-num">02</span>
+
+  <h1 style="font-size: clamp(2.5rem, 5vw, 4.5rem);">System Architecture<br>& FSM</h1>
+  <p class="subtitle">Physical components → Processing → Projection feedback</p>
+
+  <div class="grid-3">
+    <div class="sketch-box">
+      <span class="label">Physical Inputs</span>
+      <h3>What's on the table</h3>
+      <p><strong>RFID pedestal</strong> — place 3D model to select method</p>
+      <hr class="divider">
+      <p><strong>10 ArUco pucks</strong> — arrange on table to define building footprint</p>
+      <hr class="divider">
+      <p><strong>Height marker</strong> — physically distinct ArUco for floor count</p>
+      <hr class="divider">
+      <p><strong>Material controller</strong> — ArUco dial for foundation + material</p>
+      <hr class="divider">
+      <p style="font-style: italic; color: var(--light-pencil);">ESP controllers handle communication</p>
+    </div>
+
+    <div class="sketch-box">
+      <span class="label">Processing</span>
+      <h3>TouchDesigner + YOLO</h3>
+      <p><strong>Camera</strong> tracks ArUco positions, calculates distances between pucks</p>
+      <hr class="divider">
+      <p><strong>YOLO plugin</strong> for object recognition in TouchDesigner</p>
+      <hr class="divider">
+      <p><strong>Validation engine</strong> — enforces realistic constraints (e.g., earth 3DP max 1 story)</p>
+      <hr class="divider">
+      <p style="font-style: italic; color: var(--light-pencil);">Rhino/GH for geometry + parametric data</p>
+    </div>
+
+    <div class="sketch-box">
+      <span class="label">Output</span>
+      <h3>Projection + Displays</h3>
+      <p><strong>Top-down projector</strong> — footprint visualization on table</p>
+      <hr class="divider">
+      <p><strong>Phase animations</strong> — AI-generated construction sequences</p>
+      <hr class="divider">
+      <p><strong>Data per phase</strong> — CO₂, cost, labor, time, materials</p>
+      <hr class="divider">
+      <p><strong>Comparison view</strong> — side-by-side multi-build dashboard</p>
+      <hr class="divider">
+      <p style="font-style: italic; color: var(--light-pencil);">Projection mapping on 3D models too</p>
+    </div>
+  </div>
+
+  <hr class="divider">
+
+  <h2>Finite State Machine</h2>
+
+  <div class="fsm-container">
+    <!-- Setup flow -->
+    <div class="fsm-row">
+      <div class="fsm-state">IDLE</div>
+      <div class="fsm-arrow">—RFID→</div>
+      <div class="fsm-state active">METHOD SELECTED</div>
+      <div class="fsm-arrow">—pucks placed→</div>
+      <div class="fsm-state">FOOTPRINT DEFINED</div>
+      <div class="fsm-arrow">—height set→</div>
+      <div class="fsm-state">HEIGHT SET</div>
+    </div>
+
+    <!-- Config + validation -->
+    <div class="fsm-row" style="margin-top: 0.5rem;">
+      <div class="fsm-arrow">→</div>
+      <div class="fsm-state">MATERIALS CHOSEN</div>
+      <div class="fsm-arrow">—validates→</div>
+      <div class="fsm-state active">VALIDATED</div>
+      <div class="fsm-arrow">—begin→</div>
+      <div class="fsm-state" style="border-width: 3px;">PHASE DISPLAY ×5</div>
+    </div>
+
+    <!-- Error branch -->
+    <div class="fsm-row" style="margin-left: 1rem; margin-top: 0.3rem;">
+      <span style="width: 16rem; display: inline-block;"></span>
+      <div class="fsm-arrow">↓ not feasible</div>
+      <div class="fsm-state error">ERROR</div>
+      <div class="fsm-arrow">—adjust→ back to MATERIALS</div>
+    </div>
+
+    <hr class="divider" style="margin: 0.8rem 0;">
+
+    <!-- Completion -->
+    <div class="fsm-row">
+      <div class="fsm-arrow">all phases done →</div>
+      <div class="fsm-state complete">BUILDING COMPLETE</div>
+      <div class="fsm-arrow">—save→</div>
+      <div class="fsm-state active">COMPARISON</div>
+      <div class="fsm-arrow">—build another / timeout→</div>
+      <div class="fsm-state">IDLE</div>
+    </div>
+  </div>
+
+  <p class="annotation" style="margin-top: 0.8rem;">10 states · Feasibility validation with error feedback · Save & compare multiple builds</p>
+
+  <div class="ref">
+    Ref: Stefana Parascho — Cooperative Robotic Assembly (ETH Diss. 25839).
+    Assembly sequence as FSM: each state must be valid before proceeding.
+  </div>
+
+  <div class="slide-footer">
+    <span>Hardware III — IAAC MRAC+MAAI 2025/2026</span>
+    <span>2 / 3</span>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════ -->
+<!-- SLIDE 3: DATA, PRIORITIES & TIMELINE   -->
+<!-- ═══════════════════════════════════════ -->
+<section class="slide">
+  <span class="slide-num">03</span>
+
+  <h1 style="font-size: clamp(2.5rem, 5vw, 4.5rem);">Data, Priorities<br>& Timeline</h1>
+  <p class="subtitle">What we track, how we prioritize, and when we deliver</p>
+
+  <div class="grid-2">
+    <div>
+      <div class="sketch-box">
+        <span class="label">Parameters per Phase</span>
+        <table class="tech-table">
+          <tr><td>CO₂ emissions</td><td>Per ton of material, per phase</td></tr>
+          <tr><td>Labor hours</td><td>Worker time + health/safety</td></tr>
+          <tr><td>Material usage</td><td>Concrete, wood, cement — contextualized (e.g., X trees)</td></tr>
+          <tr><td>Total cost</td><td>Broken down by phase</td></tr>
+          <tr><td>Logistics</td><td>Transportation, regional (Catalonia focus)</td></tr>
+          <tr><td>Construction time</td><td>Duration per phase and total</td></tr>
+        </table>
+      </div>
+
+      <div class="sketch-box" style="margin-top: 1rem;">
+        <span class="label">Building Phases (~5 per method)</span>
+        <p><strong>1.</strong> Foundation / Excavation</p>
+        <p><strong>2.</strong> Structure / Walls</p>
+        <p><strong>3.</strong> Roof</p>
+        <p><strong>4.</strong> Windows / Openings</p>
+        <p><strong>5.</strong> Finishing (plaster, paint, floors)</p>
+        <p style="font-style: italic; color: var(--light-pencil); margin-top: 0.5rem;">
+          Exact phases per method need research — 3DP and prefab differ
+        </p>
+      </div>
+    </div>
+
+    <div>
+      <div class="sketch-box">
+        <span class="label">Development Priorities</span>
+        <p><strong style="color: var(--accent-red);">P1 — Course critical</strong></p>
+        <p>Projector + camera + ArUco tracking, square meter sizing, floor selection, GUI</p>
+        <hr class="divider">
+        <p><strong>P2 — RFID + ESP</strong></p>
+        <p>Pedestal integration, method selection, ESP communication</p>
+        <hr class="divider">
+        <p><strong>P3 — Building phases</strong></p>
+        <p>AI-generated animations, information display per phase</p>
+        <hr class="divider">
+        <p><strong>P4 — Data + Comparison</strong></p>
+        <p>Cost tracking, CO₂ tracking, dataset save, side-by-side comparison</p>
+      </div>
+
+      <div class="sketch-box dashed" style="margin-top: 1rem;">
+        <span class="label">Research Action Items</span>
+        <p>☐ Building phases for all 3 methods</p>
+        <p>☐ Contact 10+ companies per method for data</p>
+        <p>☐ AI animation tools for phase visualization</p>
+        <p>☐ 3D print ArUco pucks</p>
+        <p>☐ Install YOLO plugin for TouchDesigner</p>
+        <p>☐ Catalonia regional data (logistics)</p>
+      </div>
+    </div>
+  </div>
+
+  <hr class="divider">
+
+  <h2>Project Phases</h2>
+  <div class="timeline">
+    <div class="phase">
+      <div class="phase-label">P1</div>
+      <div class="phase-dot" style="background: var(--ink);"></div>
+      <div class="phase-desc">Projector + Camera<br>ArUco + GUI</div>
+      <div class="phase-date">Apr 17–May 4</div>
+    </div>
+    <div class="phase">
+      <div class="phase-label">P2</div>
+      <div class="phase-dot"></div>
+      <div class="phase-desc">RFID + ESP<br>Method Selection</div>
+      <div class="phase-date">May 4</div>
+    </div>
+    <div class="phase">
+      <div class="phase-label">P3</div>
+      <div class="phase-dot"></div>
+      <div class="phase-desc">Building Phases<br>Animations + Info</div>
+      <div class="phase-date">May 11</div>
+    </div>
+    <div class="phase">
+      <div class="phase-label">P4</div>
+      <div class="phase-dot"></div>
+      <div class="phase-desc">Cost + CO₂<br>Comparison View</div>
+      <div class="phase-date">May 18</div>
+    </div>
+    <div class="phase">
+      <div class="phase-label">Finals</div>
+      <div class="phase-dot"></div>
+      <div class="phase-desc">Integration<br>Testing & Demo</div>
+      <div class="phase-date">May 22</div>
+    </div>
+  </div>
+
+  <div class="ref" style="margin-top: 1.5rem;">
+    Inspired by: Swiss Museum interactive DJ table (ArUco + projection) · Stefana Parascho (ETH) · Gramazio Kohler (ETH) · Fologram Steampunk Pavilion
+  </div>
+
+  <p class="team" style="margin-top: 1rem;">
+    Instructors: Hamid Peiro · Aleksandra Kraeva &nbsp;&nbsp;|&nbsp;&nbsp; IAAC · April – May 2026
+  </p>
+
+  <div class="slide-footer">
+    <span>Hardware III — IAAC MRAC+MAAI 2025/2026</span>
+    <span>3 / 3</span>
+  </div>
+</section>
+
+</body>
+</html>
