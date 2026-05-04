@@ -44,6 +44,9 @@ def main() -> None:
     cap = open_camera(args.camera)
     sender = make_sender(args.td_host, args.td_port)
 
+    cv2.namedWindow("ArUco footprint pipeline — press Q to quit | R=resize", cv2.WINDOW_NORMAL)
+    cv2.resizeWindow("ArUco footprint pipeline — press Q to quit | R=resize", 960, 540)
+
     print(f"[INFO] Streaming ALL pucks to TD at {args.td_host}:{args.td_port}")
     print("[INFO] Press Q in the preview window to quit\n")
 
@@ -80,7 +83,7 @@ def main() -> None:
             cv2.putText(frame, f"detections: {len(detections)}", (10, 60),
                        cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 0), 2)
 
-            cv2.imshow("ArUco footprint pipeline — press Q to quit", frame)
+            cv2.imshow("ArUco footprint pipeline — press Q to quit | R=resize", frame)
             if cv2.waitKey(1) & 0xFF == ord("q"):
                 break
 
