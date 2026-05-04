@@ -1,22 +1,39 @@
-"""Footprint visualizer — Script TOP callbacks for TouchDesigner (numpy only).
+"""Footprint visualizer — Script TOP callbacks (numpy only, no PIL).
 
-Reads per-puck OSC data from oscin1, draws:
-  - Circles at each detected puck center
-  - Lines connecting pucks in ID order (polygon)
+Layout (1280x720):
+  Top-left  (0,0)→(960,540) : footprint geometry (circles + lines)
+  Top-right (960,0)→(1280,360): status color block
+  Bottom    (0,540)→(1280,720): reserved for Text TOP overlay
 
-Resolution: 1280x720. No external libs required — pure numpy.
-Text labels (distances, area) are handled by a separate Text TOP in TD.
+OSC channels from oscin1 (osc_send.py /puck/N protocol):
+  puck/N:0 = frame, puck/N:1 = proj_x, puck/N:2 = proj_y
+  vision/heartbeat:0 = frame counter
 """
 import numpy as np
 
 PROJ_W = 1280
 PROJ_H = 720
-FOOTPRINT_IDS = list(range(10))
+
+FP  = (0,   0,   960,  540)   # footprint zone
+ST  = (960, 0,   1280, 360)   # status zone
+TX  = (0,   540, 1280, 720)   # text zone (drawn by Text TOP)
+
+FOOTPRINT_IDS   = list(range(10))
 LIVENESS_FRAMES = 10
 
-COLOR_LINE  = (1.0, 1.0, 1.0, 0.8)
-COLOR_PUCK  = (0.0, 1.0, 0.4, 1.0)
-COLOR_NONE  = (0.3, 0.3, 0.3, 1.0)  # single dot when vision offline
+C_LINE    = (1.0, 1.0, 1.0, 0.8)
+C_PUCK    = (0.0, 1.0, 0.4, 1.0)
+C_DIVIDER = (0.25, 0.25, 0.25, 1.0)
+
+# Status colors: [disconnected, connected-no-pucks, partial, active-polygon]
+def _status_color(hb, n_pucks):
+    if hb < 0:
+        return (0.15, 0.15, 0.15, 1.0)   # gray: offline
+    if n_pucks == 0:
+        return (0.8, 0.8, 0.8, 1.0)      # white: online, no pucks
+    if n_pucks < 3:
+        return (0.9, 0.5, 0.0, 1.0)      # orange: some pucks, no polygon yet
+    return (0.1, 0.85, 0.2, 1.0)         # green: polygon active
 
 
 def cook(scriptOp):
@@ -30,54 +47,77 @@ def cook(scriptOp):
     pucks = {}
     for pid in FOOTPRINT_IDS:
         try:
-            puck_frame = int(osc[f'puck/{pid}:0'][0])
-            if hb >= 0 and abs(hb - puck_frame) <= LIVENESS_FRAMES:
-                px = float(osc[f'puck/{pid}:1'][0])
-                py = float(osc[f'puck/{pid}:2'][0])
-                pucks[pid] = (px, py)
+            pf = int(osc[f'puck/{pid}:0'][0])
+            if hb >= 0 and abs(hb - pf) <= LIVENESS_FRAMES:
+                pucks[pid] = (
+                    float(osc[f'puck/{pid}:1'][0]),
+                    float(osc[f'puck/{pid}:2'][0]),
+                )
         except Exception:
             pass
 
     img = np.zeros((PROJ_H, PROJ_W, 4), dtype=np.float32)
+    img[:, :, 3] = 1.0
 
-    ids_sorted = sorted(pucks.keys())
-    pts = [pucks[i] for i in ids_sorted]
+    _draw_dividers(img)
+    _draw_footprint(img, pucks)
+    _draw_status(img, hb, len(pucks))
+
+    scriptOp.copyNumpyArray(img)
+
+
+def _draw_footprint(img, pucks):
+    ids  = sorted(pucks.keys())
+    pts  = [_remap(*pucks[i]) for i in ids]
 
     if len(pts) >= 2:
         for i in range(len(pts)):
             p1 = pts[i]
             p2 = pts[(i + 1) % len(pts)]
-            _draw_line(img, p1[0], p1[1], p2[0], p2[1], COLOR_LINE, width=2)
+            _line(img, *p1, *p2, C_LINE, 2)
 
-    for pid, (px, py) in pucks.items():
-        _draw_circle(img, px, py, 14, COLOR_PUCK, width=3)
-
-    scriptOp.copyNumpyArray(img)
+    for pid, pos in pucks.items():
+        _circle(img, *_remap(*pos), 14, C_PUCK, 3)
 
 
-def _draw_line(img, x0, y0, x1, y1, color, width=2):
+def _draw_status(img, hb, n_pucks):
+    color = _status_color(hb, n_pucks)
+    x0, y0, x1, y1 = ST
+    pad = 12
+    img[y0+pad:y1-pad, x0+pad:x1-pad] = color
+
+
+def _draw_dividers(img):
+    img[FP[3]:FP[3]+2, :] = C_DIVIDER          # horizontal above text zone
+    img[:ST[3], ST[0]:ST[0]+2] = C_DIVIDER     # vertical between FP and ST
+
+
+def _remap(px, py):
+    x = FP[0] + (px / PROJ_W) * (FP[2] - FP[0])
+    y = FP[1] + (py / PROJ_H) * (FP[3] - FP[1])
+    return x, y
+
+
+def _line(img, x0, y0, x1, y1, color, width=2):
     h, w = img.shape[:2]
-    length = max(int(((x1 - x0) ** 2 + (y1 - y0) ** 2) ** 0.5 * 2), 2)
-    t = np.linspace(0, 1, length)
-    xs = (x0 + t * (x1 - x0)).astype(int)
-    ys = (y0 + t * (y1 - y0)).astype(int)
+    n = max(int(((x1-x0)**2 + (y1-y0)**2)**0.5 * 2), 2)
+    t  = np.linspace(0, 1, n)
+    xs = (x0 + t*(x1-x0)).astype(int)
+    ys = (y0 + t*(y1-y0)).astype(int)
     half = width // 2
-    for dx in range(-half, half + 1):
-        for dy in range(-half, half + 1):
-            xc = np.clip(xs + dx, 0, w - 1)
-            yc = np.clip(ys + dy, 0, h - 1)
+    for dx in range(-half, half+1):
+        for dy in range(-half, half+1):
+            xc = np.clip(xs+dx, 0, w-1)
+            yc = np.clip(ys+dy, 0, h-1)
             img[yc, xc] = color
 
 
-def _draw_circle(img, cx, cy, r, color, width=3):
+def _circle(img, cx, cy, r, color, width=3):
     h, w = img.shape[:2]
-    x0 = max(0, int(cx - r - width))
-    x1 = min(w, int(cx + r + width + 1))
-    y0 = max(0, int(cy - r - width))
-    y1 = min(h, int(cy + r + width + 1))
+    x0 = max(0, int(cx-r-width)); x1 = min(w, int(cx+r+width+1))
+    y0 = max(0, int(cy-r-width)); y1 = min(h, int(cy+r+width+1))
     if x1 <= x0 or y1 <= y0:
         return
     Y, X = np.mgrid[y0:y1, x0:x1]
-    dist = np.sqrt((X - cx) ** 2 + (Y - cy) ** 2)
-    mask = (dist >= r - width / 2) & (dist <= r + width / 2)
-    img[y0:y1, x0:x1][mask] = color
+    d = np.sqrt((X-cx)**2 + (Y-cy)**2)
+    img[y0:y1, x0:x1][(d >= r-width/2) & (d <= r+width/2)] = color
