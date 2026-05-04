@@ -12,12 +12,14 @@
 
 The ESP32-WROOM-32 microcontroller sits at the junction between the physical interaction layer and the software FSM. Its job is to:
 
-1. **Detect user engagement** via proximity sensor (HC-SR04 ultrasonic or PIR) → triggers data zoom/focus in projection
-2. **Identify construction method** via RFID reader (MFRC522) → tells TouchDesigner which model was placed
-3. **Stream sensor data** over WiFi/OSC to TouchDesigner at 50–100 Hz
-4. **Log all events** locally for debugging and post-demo analysis
+1. **Trigger user engagement** via proximity sensor (HC-SR04 ultrasonic or PIR) → initiates IDLE → ONBOARDING transition when user approaches
+2. **Detect user presence & absence** → maintains session active while user is present; triggers timeout/reset if user leaves for >30s
+3. **Identify construction method** via RFID reader (MFRC522) → tells TouchDesigner which model was placed on table
+4. **Stream sensor data** over WiFi/OSC to TouchDesigner at 50–100 Hz
+5. **Coordinate sound cues** (via audio layer integration point) on key state transitions
+6. **Log all events** locally for debugging and post-demo analysis
 
-This document specifies the hardware, firmware architecture, OSC protocol, calibration procedure, and QA checklist.
+This document specifies the hardware, firmware architecture, OSC protocol, calibration procedure, QA checklist, and demo operation runbook.
 
 ---
 
@@ -126,10 +128,17 @@ SETUP
 
 LOOP (50–100 Hz, ~10–20ms per iteration)
   ├─ Measure HC-SR04 distance
-  │  └─ Send if distance < threshold (e.g., 30cm = "leaning in")
+  │  ├─ If distance < PROXIMITY_THRESHOLD → userPresent = true
+  │  │  └─ Send /proximity/presence 1 → triggers IDLE → ONBOARDING
+  │  └─ If distance > ABSENCE_TIMEOUT_CM for >30s → userPresent = false
+  │     └─ Send /proximity/presence 0 → triggers timeout/reset
+  │
   ├─ Check for new RFID tag
-  │  └─ If found: match against model table → send OSC
-  ├─ Send OSC batch (proximity + any state change)
+  │  └─ If found: match against model table → send /rfid/model + /rfid/method
+  │
+  ├─ Track user session (proximity timer)
+  │  └─ If no proximity for >30s while system active → suggest timeout
+  │
   └─ Yield to WiFi stack (delay ~10ms)
 ```
 
@@ -145,9 +154,11 @@ LOOP (50–100 Hz, ~10–20ms per iteration)
 #define HC_ECHO_PIN     2      // Echo (input)
 
 // ===== Timing (milliseconds) =====
-#define PROXIMITY_POLL_INTERVAL   20    // Read HC-SR04 every 20ms
-#define RFID_DEBOUNCE_TIME       1000   // Ignore same tag for 1s
-#define PROXIMITY_THRESHOLD_CM    30    // "Leaning in" = closer than 30cm
+#define PROXIMITY_POLL_INTERVAL       20    // Read HC-SR04 every 20ms
+#define RFID_DEBOUNCE_TIME           1000   // Ignore same tag for 1s
+#define PROXIMITY_THRESHOLD_CM         30    // User "present" = closer than 30cm
+#define USER_ABSENCE_TIMEOUT_MS    30000    // 30s of no proximity → trigger reset/idle
+#define ABSENCE_CHECK_INTERVAL      5000    // Check timeout every 5s
 
 // ===== WiFi =====
 #define WIFI_RECONNECT_TIMEOUT   30000  // Retry connection every 30s
@@ -416,33 +427,67 @@ All messages are sent **from ESP32 → TouchDesigner** over WiFi UDP on port **9
 
 ```
 /proximity/distance       <float>  distance in cm (0–400)
-/proximity/lean_in        <int>    1 if distance < 30cm, else 0
+/proximity/presence       <int>    1 if user present (< 30cm), 0 if absent (>30s no detection)
 /rfid/model              <int>    1, 2, or 3 (model identifier)
+/rfid/method             <string> "masonry", "3d_print", or "prefab" (human-readable)
 /esp32/heartbeat         <int>    1 (sent every 5 seconds, for health check)
+/esp32/state_trigger     <string> "user_entered", "user_left", "model_placed" (FSM events)
 /esp32/error             <string> error message (if something fails)
 ```
 
-### 4.2 Example OSC Sequence
+### 4.2 FSM State Triggering via Proximity
+
+The proximity sensor drives the main FSM transitions:
 
 ```
-t=0s:    [User walks toward table]
-         /proximity/distance  150.2
-         /proximity/lean_in   0
+No user detected → /proximity/presence = 0
+↓
+(IDLE state, ambient display)
+↓
+User approaches (distance < 30cm) → /proximity/presence = 1 + /esp32/state_trigger "user_entered"
+↓
+(FSM transitions: IDLE → ONBOARDING)
+↓
+User places model → /rfid/model arrives
+↓
+(FSM processes placement and validates)
+↓
+User leaves (no proximity for 30s) → /proximity/presence = 0 + /esp32/state_trigger "user_left"
+↓
+(FSM may trigger timeout/reset if mid-workflow)
+```
 
-t=1s:    [User leans in to place model]
-         /proximity/distance   28.5
-         /proximity/lean_in    1
+### 4.3 Example OSC Sequence
 
-t=1.5s:  [Model placed, RFID detected]
-         /rfid/model           2
-         /proximity/distance   45.0
-         /proximity/lean_in    0
-
-t=6s:    [Heartbeat]
+```
+t=0s:    [System in IDLE, no user]
+         /proximity/presence   0
          /esp32/heartbeat      1
+
+t=15s:   [User walks toward table, approaches]
+         /proximity/distance   80.5
+         /proximity/presence   1
+         /esp32/state_trigger  "user_entered"
+
+t=16s:   [User leans in to place model]
+         /proximity/distance   25.0
+         /esp32/heartbeat      1
+
+t=17s:   [Model placed, RFID detected]
+         /rfid/model           2
+         /rfid/method          "3d_print"
+         /proximity/distance   45.0
+
+t=25s:   [User continues, still present]
+         /proximity/presence   1
+         /esp32/heartbeat      1
+
+t=60s:   [User walks away, no proximity for >30s]
+         /proximity/presence   0
+         /esp32/state_trigger  "user_left"
 ```
 
-### 4.3 TouchDesigner Integration
+### 4.4 TouchDesigner Integration
 
 In **TouchDesigner**, receive these messages with an **OSC In CHOP**:
 
@@ -451,22 +496,89 @@ OSC In CHOP
   Active:       On
   Network Port: 9000
   
-Outputs:
-  - /proximity/distance  → float channel [0, 400]
-  - /proximity/lean_in   → int channel {0, 1}
-  - /rfid/model          → int channel {1, 2, 3}
+Key inputs:
+  - /proximity/presence    → int {0, 1} — drives IDLE ↔ ONBOARDING transition
+  - /proximity/distance    → float [0, 400] — optional viz feedback (zoom on lean-in)
+  - /rfid/model            → int {1, 2, 3} — identifies model for state validation
+  - /esp32/state_trigger   → string — logs FSM events
+  - /esp32/heartbeat       → int — monitors ESP32 connectivity
 ```
 
-Then route to your FSM logic:
-- If `/rfid/model` changes → transition state (IDLE → GUIDING)
-- If `/proximity/lean_in` = 1 → zoom/highlight active piece
-- Monitor `/esp32/heartbeat` for connectivity (should arrive every 5s)
+**FSM integration logic:**
+
+```python
+# Pseudocode in TouchDesigner
+
+def onProximityChange(presence):
+    if presence == 1 and currentState == "IDLE":
+        triggerStateChange("ONBOARDING")
+        playSound("user_entered")
+    elif presence == 0 and currentState != "IDLE":
+        if timeInState > 30s:
+            triggerStateChange("RESET")
+            playSound("timeout")
+
+def onRFIDDetected(modelID):
+    if currentState == "ONBOARDING":
+        triggerStateChange("VALIDATING")
+        playSound("model_accepted")
+```
 
 ---
 
-## 5. Calibration & Setup
+## 5. Sound Cueing System
 
-### 5.1 Scanning RFID Tags (First Time)
+The ESP32 does not generate audio directly. Instead, it **signals key events** via `/esp32/state_trigger` OSC messages, which TouchDesigner or an external audio layer maps to sound cues.
+
+### 5.1 Sound Events & Triggers
+
+| Event | OSC Message | Recommended Sound | Purpose |
+|-------|-------------|-------------------|---------|
+| User enters | `/esp32/state_trigger` = `"user_entered"` | Bright tone / welcome chime | Signal attention → system active |
+| Piece accepted | `/rfid/model` arrives + valid | Ascending tone / success ding | Confirm model identification |
+| Validation starts | FSM → VALIDATING | Pulsing / scanning tone | Feedback that system is checking |
+| Validation complete | FSM → ANALYSING | Resolved tone | Placement confirmed |
+| Error / rejection | FSM → ERROR | Low tone / buzz | Piece placement wrong → try again |
+| Confirmation | FSM → RESULT | Celebratory chime | Data calculated, ready for next |
+| User leaves | `/esp32/state_trigger` = `"user_left"` | Fade-out tone | Session ending |
+| Timeout / reset | FSM → IDLE (after timeout) | Reset tone | Return to start state |
+
+### 5.2 Integration Points
+
+**Option A: TouchDesigner audio layer (preferred)**
+
+```python
+# In TouchDesigner CHOP Execute DAT
+
+def onStateChange(newState):
+    if newState == "VALIDATING":
+        op('audio_out').play("validation_loop.wav")
+    elif newState == "RESULT":
+        op('audio_out').play("success_chord.wav")
+```
+
+**Option B: External audio system**
+
+- ESP32 sends `/esp32/state_trigger` → external audio controller listens
+- Audio controller maps string → WAV file → speaker output
+- Decouples firmware from audio; allows live sound design
+
+**Option C: Piezo buzzer on ESP32 (future)**
+
+- Add 5V piezo to GPIO 32
+- Firmware generates tones directly for simple beeps
+- Good for quick feedback; limited expressiveness
+
+### 5.3 Audio Design Recommendations
+
+- **Response time:** Sound should play within 200ms of trigger (no lag)
+- **Level:** Mix at -18dB so speech/music clarity is maintained
+- **Variety:** 5–8 distinct sounds; avoid repetition fatigue
+- **Loop length:** Keep ambient loops <10s to prevent tediousness
+
+## 6. Calibration & Setup
+
+### 6.1 Scanning RFID Tags (First Time)
 
 1. **Load test sketch:** Upload `firmware/test_rfid_scan.ino` to ESP32
 2. **Open Serial Monitor** (115200 baud)
@@ -482,18 +594,29 @@ Card UID: AA:BB:CC:DD
 Card UID: 11:22:33:44
 ```
 
-### 5.2 Proximity Threshold Tuning
+### 6.2 Proximity Threshold Tuning
 
 1. **Mount HC-SR04** on table edge or overhead rig (facing user)
 2. **Upload firmware** with **Serial logging enabled**
 3. **Open Serial Monitor** to see real-time distance values
 4. **Stand at table** and note distance at:
-   - Arm's length (normal placement) → ~60–80cm
+   - Arm's length (normal viewing) → ~100–150cm
+   - Standing upright at table → ~60–80cm
    - Leaning in (face close to table) → ~20–40cm
-5. **Set `PROXIMITY_THRESHOLD_CM`** to a value in the middle (e.g., 30cm)
-6. **Test a few times** to confirm detection is smooth (not flickering on/off)
+   - User entering trigger zone → <30cm
+5. **Set `PROXIMITY_THRESHOLD_CM`** to 30cm (triggers ONBOARDING)
+6. **Set `USER_ABSENCE_TIMEOUT_MS`** to 30000 (30 seconds)
+7. **Test a few times** to confirm detection is smooth (not flickering on/off)
 
-### 5.3 WiFi Connection Check
+### 6.3 User Absence Timeout Tuning
+
+1. **Demo the workflow** with 2+ people taking turns
+2. **Observe:** How long does a user typically spend at the table per interaction?
+3. **If timeout too aggressive** (resets mid-workflow): increase `USER_ABSENCE_TIMEOUT_MS`
+4. **If timeout too lenient** (doesn't reset when user leaves): decrease timeout
+5. **Recommended:** 30–45 seconds for hands-on model placement
+
+### 6.4 WiFi Connection Check
 
 1. **Open Serial Monitor** and look for:
    ```
@@ -509,18 +632,20 @@ Card UID: 11:22:33:44
    - Firmware includes auto-reconnect; should recover within 10s
    - Consider adding a battery to eliminate USB cable interference
 
-### 5.4 Full Integration Test
+### 6.5 Full Integration Test
 
 1. **Start TouchDesigner** with OSC In CHOP listening on port 9000
 2. **Power up ESP32** (USB or battery)
 3. **Verify heartbeat messages** arrive every 5 seconds
-4. **Present RFID tag** → `/rfid/model` message should appear in OSC In CHOP
-5. **Lean toward HC-SR04** → `/proximity/lean_in` should toggle to 1
-6. **Check Serial Monitor** for any error messages
+4. **Approach sensor** with no object → `/proximity/presence` should toggle to 1
+5. **Verify `/esp32/state_trigger "user_entered"`** appears in TouchDesigner
+6. **Present RFID tag** → `/rfid/model` message should appear in OSC In CHOP
+7. **Walk away** from sensor for 30+ seconds → `/proximity/presence` should toggle to 0
+8. **Check Serial Monitor** for any error messages
 
 ---
 
-## 6. PlatformIO Configuration
+## 7. PlatformIO Configuration
 
 ```ini
 # platformio.ini
@@ -544,7 +669,7 @@ build_flags =
 
 ---
 
-## 7. Troubleshooting & Common Issues
+## 8. Troubleshooting & Common Issues
 
 | Issue | Cause | Solution |
 |-------|-------|----------|
@@ -559,23 +684,23 @@ build_flags =
 
 ---
 
-## 8. Assembly, Mounting & Cable Management
+## 9. Assembly, Mounting & Cable Management
 
-### 8.1 Table Integration
+### 9.1 Table Integration
 
 - **Pedestal location:** Underneath or beside the main table (out of sight of camera)
 - **Proximity sensor:** Mounted horizontally on table edge, ~20cm from where user stands
 - **RFID reader:** Mounted vertically under the table surface (reads tags on model bases from below)
 - **ESP32 + antenna:** Inside 3D-printed enclosure near reader to keep SPI cable short
 
-### 8.2 Cable Routing
+### 9.2 Cable Routing
 
 1. **RFID wires (SPI):** ~20cm from reader to ESP32; use shielded cable if available
 2. **HC-SR04 wires:** ~30cm from sensor to ESP32; keep ECHO and TRIG twisted
 3. **USB power:** Routed along table leg; tape down to prevent tripping
 4. **WiFi:** No cable; ensure antenna is vertical for best signal
 
-### 8.3 Enclosure (Optional 3D Print)
+### 9.3 Enclosure (Optional 3D Print)
 
 Design a box with:
 - Hole for USB micro-B connector
@@ -598,24 +723,138 @@ Design a box with:
 
 ---
 
-## 9. QA / Demo Checklist
+## 10. QA Checklist & Demo Preparation
 
-Before final presentation:
+Before final presentation, run through these checks systematically.
 
-- [ ] **RFID:** All 3 tags read correctly; right model ID sent for each
-- [ ] **Proximity:** Distance values update smoothly; lean-in toggle works at 30cm
-- [ ] **WiFi:** Heartbeat messages arrive every 5s; no reconnects during 10-minute demo
-- [ ] **Serial/Logging:** No crash messages; CPU load stable
-- [ ] **TouchDesigner:** OSC messages appear in monitor; FSM state changes correctly on tag read
-- [ ] **Power:** USB cable secure; no data corruption if cable briefly loose
-- [ ] **Cables:** No dangling wires; neatly routed; no interference with camera/projector
-- [ ] **Enclosure:** Neat appearance; all labels visible; mounting secure
-- [ ] **Backup:** Firmware .hex backed up; secrets.h with correct credentials saved safely
-- [ ] **Documentation:** UIDs written in `firmware/docs/UIDs.txt`; calibration values logged
+### 10.1 Hardware & Wiring QA
+
+- [ ] **RFID reader** powers up; antenna LED (if present) blinks
+- [ ] **HC-SR04** powers up; no flashing lights (indicates initialization)
+- [ ] **ESP32** powers up; Serial Monitor shows "Setup complete"
+- [ ] **SPI wiring:** All 6 MFRC522 pins connected correctly (check with multimeter)
+- [ ] **GPIO wiring:** HC-SR04 TRIG & ECHO on correct pins (GPIO 4 & 2)
+- [ ] **Decoupling caps:** 100nF caps soldered near MFRC522 and ESP32 power pins
+- [ ] **No cold solder joints** on any connections
+
+### 10.2 Firmware & Software QA
+
+- [ ] **RFID:** All 3 tags read correctly; UIDs match `models[]` array
+- [ ] **RFID:** Correct model ID sent for each tag (`/rfid/model` = 1, 2, or 3)
+- [ ] **Proximity:** Distance values update smoothly (no jumps >10cm between reads)
+- [ ] **Proximity:** `/proximity/presence` toggles correctly at ~30cm threshold
+- [ ] **WiFi:** Connects on startup within 10 seconds
+- [ ] **WiFi:** Heartbeat messages arrive every 5 seconds (no gaps >10s)
+- [ ] **WiFi:** No disconnects during 10-minute continuous operation
+- [ ] **OSC:** All messages reach TouchDesigner (verify in OSC In CHOP)
+- [ ] **Serial logging:** No crash messages; CPU load stays <80%
+
+### 10.3 Integration QA
+
+- [ ] **TouchDesigner FSM** state changes when RFID tag detected
+- [ ] **Proximity presence** transitions trigger expected visual/audio cues
+- [ ] **User absence timeout** resets system after 30s with no proximity
+- [ ] **State transitions** are smooth (no lag >500ms)
+- [ ] **Error recovery:** If WiFi drops, system reconnects and resumes
+
+### 10.4 Physical Assembly QA
+
+- [ ] **Power cable:** Routed safely; secured with tape/velcro
+- [ ] **Sensor cables:** All crimped/soldered connections solid; no loose wires
+- [ ] **Enclosure:** Mounted securely; no vibration when table is tapped
+- [ ] **Proximity sensor aim:** Points directly at user standing zone (no obstructions)
+- [ ] **RFID reader:** Mounted under table, flush with surface for easy tag detection
+- [ ] **Antenna:** Vertical orientation for best WiFi range
+
+### 10.5 Backup & Documentation QA
+
+- [ ] **Firmware backup:** `.hex` file saved to external drive
+- [ ] **secrets.h:** Credentials saved in secure location (not in git)
+- [ ] **RFID UIDs:** Written in `firmware/docs/UIDs.txt` (tag mapping)
+- [ ] **Calibration values:** Logged in `firmware/docs/CALIBRATION.md`
+- [ ] **Wiring diagram:** Photo or high-res image saved
+- [ ] **Known issues:** Any workarounds documented
 
 ---
 
-## 10. Post-Demo Analysis & Logging
+## 11. Demo Operation Runbook
+
+This is your **step-by-step setup, run, and shutdown checklist** for demo day.
+
+### 11.1 Pre-Demo Setup (30 minutes before)
+
+1. **Power sequence:**
+   - Connect ESP32 USB power cable to laptop
+   - Wait 5s for Serial Monitor to show "Setup complete"
+   - Verify WiFi connection message in Serial Monitor
+   - Confirm heartbeat messages in TouchDesigner OSC In CHOP (should see `/esp32/heartbeat` every 5s)
+
+2. **Hardware checks:**
+   - Press each RFID tag to reader; verify `/rfid/model` arrives in OSC
+   - Slowly walk toward proximity sensor; verify `/proximity/presence` transitions from 0 → 1
+   - Walk away; verify presence transitions back to 0 after 30s
+
+3. **TouchDesigner startup:**
+   - Open TD project
+   - Verify OSC In CHOP is listening on port 9000
+   - Trigger a manual state change (e.g., keystroke) to confirm FSM is responsive
+   - Test audio cues (if applicable)
+
+4. **Projection setup:**
+   - Projector powers on; brightness at 70–80%
+   - Calibrate homography if needed (should persist from last session)
+   - Run 1-minute warmup loop to ensure no overheating
+
+### 11.2 During Demo (hands-off)
+
+- **Monitor Serial Monitor** for errors (window on side of screen)
+- **Watch OSC In CHOP** for heartbeat continuity (if heartbeat stops → WiFi dropped)
+- **Listen for audio cues** that match expected state transitions
+- **Have a phone nearby** with a note of your laptop IP (in case USB cable fails; can switch to battery + pre-configured IP)
+
+### 11.3 Demo Fallback Plan
+
+**If WiFi drops mid-demo:**
+- Firmware auto-reconnects within 10s; system should resume
+- If >20s without heartbeat: unplug USB, wait 3s, replug (hard reset)
+
+**If RFID tag not detected:**
+- Tag may be too far from reader; ensure tag is within 2cm and flush against table
+- Try presenting a different tag to verify reader is working
+- If all tags fail: restart ESP32 (unplug/replug USB)
+
+**If proximity sensor not responding:**
+- User may be outside detection zone; adjust walking distance
+- If manual test shows no distance readings: check GPIO wiring (ECHO pin especially)
+- Quick fix: reload firmware via Arduino IDE
+
+**If audio cues not playing:**
+- Not critical; system continues with visual feedback
+- Check TouchDesigner audio output device is active
+
+### 11.4 Post-Demo Shutdown (5 minutes after)
+
+1. **Save logs:**
+   - Copy Serial Monitor output to a text file
+   - Note any errors, WiFi drops, or sensor glitches
+   - Timestamp the log (helps with post-demo analysis)
+
+2. **Power down:**
+   - Stop TouchDesigner (Ctrl+Q)
+   - Unplug ESP32 USB power
+   - Power down projector
+   - Close all applications
+
+3. **Post-demo review:**
+   - Did all RFID tags read correctly?
+   - Did proximity sensor trigger expected state transitions?
+   - Did WiFi remain stable for entire demo?
+   - Any audio/visual mismatches?
+   - Document any issues in `.planning/REVIEW-S1.md` or similar
+
+---
+
+## 12. Post-Demo Analysis & Logging
 
 To aid debugging after the demo:
 
@@ -634,7 +873,7 @@ To aid debugging after the demo:
 
 ---
 
-## 11. Future Enhancements
+## 13. Future Enhancements
 
 - **Multi-sensor:** Add temperature, humidity, or capacitive touch to model bases
 - **BLE beacon:** Alternative to OSC for lower-power operation
@@ -642,39 +881,46 @@ To aid debugging after the demo:
 - **Onboard SD card:** Log all sensor data to SD for detailed analysis
 - **LED feedback:** RGB LED on enclosure to show WiFi/RFID status
 - **Audio cue:** Piezo buzzer to confirm tag read or proximity event
+- **Gesture recognition:** Add accelerometer to detect "lean in" gestures beyond distance
+- **Multi-model support:** Handle >3 construction methods via additional RFID tags
 
 ---
 
-## 12. Repository Structure
+## 14. Repository Structure
 
-Final firmware directory:
+Final firmware directory structure:
 
 ```
 firmware/
-├── README.md                         # General overview
-├── ESP32-SENSOR-SYSTEM.md           # This file (comprehensive spec)
-├── platformio.ini                    # Build config
-├── src/
-│   ├── main.cpp                      # Main loop
-│   ├── rfid_handler.cpp
-│   ├── rfid_handler.h
-│   ├── proximity_handler.cpp
-│   ├── proximity_handler.h
-│   ├── osc_sender.cpp
-│   ├── osc_sender.h
-│   ├── config.h
-│   └── secrets.h.example
-├── test/
-│   └── test_rfid_scan.ino            # Utility: scan tag UIDs
-└── docs/
-    ├── CALIBRATION.md                # Detailed tuning steps
-    ├── UIDs.txt                      # Scanned tag mapping
-    └── WIRING.png                    # High-res wiring diagram
+├── README.md                                  # General overview
+├── esp32-integration/
+│   ├── ESP32-SENSOR-SYSTEM.md                # This file (comprehensive spec)
+│   ├── platformio.ini                        # PlatformIO build config
+│   ├── src/
+│   │   ├── main.cpp                          # Main loop + setup
+│   │   ├── rfid_handler.cpp
+│   │   ├── rfid_handler.h
+│   │   ├── proximity_handler.cpp
+│   │   ├── proximity_handler.h
+│   │   ├── osc_sender.cpp
+│   │   ├── osc_sender.h
+│   │   ├── config.h                          # Pin definitions, constants
+│   │   └── secrets.h.example                 # WiFi credentials template
+│   ├── test/
+│   │   └── test_rfid_scan.ino                # Utility: scan tag UIDs
+│   └── docs/
+│       ├── CALIBRATION.md                    # Detailed tuning steps (post-calibration)
+│       ├── UIDs.txt                          # Scanned RFID tag mapping
+│       ├── WIRING.md                         # Full wiring schematic + photos
+│       └── AUDIO_CUE_LIST.md                 # Sound events + file references
+├── [legacy/ or old/]                         # Previous iterations (if any)
+└── .gitignore                                # Exclude: secrets.h, *.hex, build/
 ```
 
 ---
 
 **Author:** ESP32 / Sensor + Sound + QA / Ops  
 **Reviewed by:** System Architecture Lead (integration sign-off)  
-**Status:** Draft → Ready for fabrication & firmware coding
+**Last Updated:** 2026-05-04  
+**Status:** Comprehensive spec with demo runbook & QA checklist — Ready for firmware implementation & demo day operation
 
