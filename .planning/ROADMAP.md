@@ -9,6 +9,15 @@
 
 Six-phase project to build an interactive table installation where users assemble 2–4 physical scale models (each a different construction method) guided by projection. Data (CO₂, labor hours) appears piece by piece; a final comparison view is projected after all models complete.
 
+### Canonical layered model
+
+The roadmap now assumes a layered TouchDesigner state model:
+- **Canonical content FSM**: `IDLE -> METHOD -> FOOTPRINT -> HEIGHT -> MATERIALS -> VALIDATED -> PHASE_N -> COMPARISON`
+- **System wrapper states**: `CALIBRATION_CHECK`, `ERROR`, `RESET`, `MANUAL_OVERRIDE`
+- **Visual feedback states**: `DISCONNECTED`, `PENDING`, `INVALID`, `VALID`, `IDLE_ANIM`, `SUMMARY`, `COMPARISON`
+
+All phase goals and success criteria should be interpreted through this separation.
+
 ## Phases
 
 - [x] **Phase 1: Proposal & FSM Foundation** — Submitted April 17, 2026 (`Group_3_Hardware_III_Proposal.pdf`)
@@ -77,7 +86,7 @@ Six-phase project to build an interactive table installation where users assembl
 **Requirements**: HITL-01, HITL-02, HITL-03, HITL-04
 **Success Criteria** (what must be TRUE):
   1. Assembly sequence defined per method (5 phases × 3 methods = 15 phase configurations).
-  2. CHECKING state validates within 300 ms, ERROR recovery without full reset.
+  2. Visual validation feedback resolves within 300 ms, with `INVALID` / `VALID` projection feedback and recovery without full reset while the content FSM stays in the active step.
   3. **Methodology-wobble layer** (toggleable) shows assumption set, swing range, and source tier behind each LCA number. This is the project's pedagogical contribution per lit-review strands 04, 05, 06 — built as a first-class TD component, not a footnote.
   4. **Real-world equivalents always paired with the absolute number AND assumption** (Reijnierse 2025 — strand 05). No standalone "X trees" framings.
   5. RFID pedestal + ESP integration via OSC over WiFi to TouchDesigner.
