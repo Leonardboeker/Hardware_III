@@ -11,12 +11,12 @@ OSC channels from oscin1 (osc_send.py /puck/N protocol):
 """
 import numpy as np
 
-PROJ_W = 1280
-PROJ_H = 720
+PROJ_W = 1920
+PROJ_H = 1080
 
-FP  = (0,   0,   960,  540)   # footprint zone
-ST  = (960, 0,   1280, 360)   # status zone
-TX  = (0,   540, 1280, 720)   # text zone (drawn by Text TOP)
+FP  = (0,    0,    1440, 810)   # footprint zone  (75% width, 75% height)
+ST  = (1440, 0,    1920, 540)   # status zone     (top-right)
+TX  = (0,    810,  1920, 1080)  # text zone       (bottom bar)
 
 FOOTPRINT_IDS   = list(range(10))
 LIVENESS_FRAMES = 10
