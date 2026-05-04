@@ -12,7 +12,7 @@ Output channels:
   hb_alive     int    1 = vision pipeline is running, 0 = offline / timed out
 
 Dependencies (named operators in the same base COMP):
-  oscin1       OSC In CHOP    — vision pipeline data
+  cam          OSC In CHOP    — vision pipeline data
   serial1      Serial DAT     — ESP32/RFID data (optional; method_id=0 if absent)
 """
 import math
@@ -28,11 +28,11 @@ def cook(scriptOp):
     scriptOp.appendChan('method_id')
     scriptOp.appendChan('hb_alive')
 
-    osc = op('osc')
+    cam = op('cam')
 
     # heartbeat
     try:
-        hb = int(osc['vision/heartbeat:0'][0])
+        hb = int(cam['vision/heartbeat:0'][0])
         hb_alive = 1
     except Exception:
         hb = -1
@@ -42,11 +42,11 @@ def cook(scriptOp):
     pucks = {}
     for pid in FOOTPRINT_IDS:
         try:
-            pf = int(osc[f'puck/{pid}:0'][0])
+            pf = int(cam[f'puck/{pid}:0'][0])
             if hb >= 0 and abs(hb - pf) <= LIVENESS_FRAMES:
                 pucks[pid] = (
-                    float(osc[f'puck/{pid}:1'][0]),
-                    float(osc[f'puck/{pid}:2'][0]),
+                    float(cam[f'puck/{pid}:1'][0]),
+                    float(cam[f'puck/{pid}:2'][0]),
                 )
         except Exception:
             pass

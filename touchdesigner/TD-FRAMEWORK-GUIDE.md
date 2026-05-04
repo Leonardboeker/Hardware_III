@@ -9,7 +9,7 @@ Short names that say what the node **does**, not what type it is:
 
 | TD Node name | Type | Role |
 |---|---|---|
-| `osc` | OSC In CHOP | receives puck positions from vision pipeline |
+| `cam` | OSC In CHOP | receives puck positions from vision pipeline |
 | `rfid` | Serial DAT | receives RFID tag scans from ESP32 |
 | `state` | Script CHOP | aggregates all state into 4 channels |
 | `viz` | Script TOP | renders the 1280×720 projection image |
@@ -22,7 +22,7 @@ Short names that say what the node **does**, not what type it is:
 ## Architecture overview
 
 ```
-osc  ────────────────────────────┐
+cam  ────────────────────────────┐
                                  ▼
 rfid ──► state (Script CHOP) ──► viz (Script TOP)
   └── serial_rfid_v1.py   state_chop_v1.py    footprint_viz_v5.py
@@ -41,15 +41,15 @@ rfid ──► state (Script CHOP) ──► viz (Script TOP)
 Delete if they exist from the previous session:
 - `switch1`, `script1`, `script2`, `text1`, `over1` (all replaced by new names above)
 
-Keep: `oscin1` (rename it to `osc`), `window1` (rename to `out`).
+Keep: `oscin1` (rename it to `cam`), `window1` (rename to `out`).
 
 To rename a node: double-click its name label in the network editor.
 
 ---
 
-## Step 2 — `osc` — OSC In CHOP
+## Step 2 — `cam` — OSC In CHOP
 
-Already exists as `oscin1`. Rename it to `osc`.
+Already exists as `oscin1`. Rename it to `cam`.
 
 Verify settings:
 - **Protocol** → UDP
@@ -90,7 +90,7 @@ Add → CHOP → Script → rename to `state`
 
 Output channels: `puck_count`, `area_px2`, `method_id`, `hb_alive`
 
-> The script references `op('osc')` and `op('rfid')` by name — make sure both nodes are named exactly that.
+> The script references `op('cam')` and `op('rfid')` by name — make sure both nodes are named exactly that.
 
 ---
 
@@ -103,7 +103,7 @@ Add → TOP → Script → rename to `viz`
 3. Resolution: **1280 × 720**
 4. **Cook Type** → Every Frame
 
-> References `op('osc')` and `op('state')` by name.
+> References `op('cam')` and `op('state')` by name.
 
 ---
 
@@ -155,10 +155,10 @@ To preview without projector: **Open** → On
 
 | Node | Type | Reads from | Provides |
 |------|------|-----------|----------|
-| `osc` | OSC In CHOP | vision pipeline (port 7000) | puck positions + heartbeat |
+| `cam` | OSC In CHOP | vision pipeline (port 7000) | puck positions + heartbeat |
 | `rfid` | Serial DAT | ESP32 (USB serial) | RFID tag → method_id |
-| `state` | Script CHOP | `osc`, `rfid` | puck_count, area_px2, method_id, hb_alive |
-| `viz` | Script TOP | `osc`, `state` | 1280×720 render |
+| `state` | Script CHOP | `cam`, `rfid` | puck_count, area_px2, method_id, hb_alive |
+| `viz` | Script TOP | `cam`, `state` | 1280×720 render |
 | `stats` | Text TOP | `state` | stats string |
 | `comp` | Over TOP | `viz`, `stats` | composited frame |
 | `out` | Window COMP | `comp` | projector |
