@@ -1,0 +1,49 @@
+{
+  "methods": [
+    {
+      "id": 0,
+      "name": "NONE",
+      "rfid_tag": "00000000",
+      "color_rgb": [0.4, 0.4, 0.4],
+      "min_pucks": 0,
+      "max_pucks": 10,
+      "description": "No construction method selected"
+    },
+    {
+      "id": 1,
+      "name": "CANTILEVER",
+      "rfid_tag": "A1B2C3D4",
+      "color_rgb": [0.0, 0.55, 1.0],
+      "min_pucks": 2,
+      "max_pucks": 6,
+      "description": "Horizontal projection from a support — requires at least 2 pucks"
+    },
+    {
+      "id": 2,
+      "name": "COLUMN GRID",
+      "rfid_tag": "E5F6A7B8",
+      "color_rgb": [1.0, 0.38, 0.0],
+      "min_pucks": 4,
+      "max_pucks": 10,
+      "description": "Regular grid of vertical supports — minimum 4 pucks for a grid"
+    },
+    {
+      "id": 3,
+      "name": "ARCH",
+      "rfid_tag": "C9D0E1F2",
+      "color_rgb": [0.75, 0.08, 0.82],
+      "min_pucks": 3,
+      "max_pucks": 8,
+      "description": "Curved compression structure — minimum 3 pucks to define the curve"
+    },
+    {
+      "id": 4,
+      "name": "TRUSS",
+      "rfid_tag": "A3B4C5D6",
+      "color_rgb": [0.95, 0.75, 0.0],
+      "min_pucks": 4,
+      "max_pucks": 10,
+      "description": "Triangulated lightweight structure — minimum 4 pucks"
+    }
+  ]
+}
