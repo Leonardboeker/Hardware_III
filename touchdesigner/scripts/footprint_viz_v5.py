@@ -56,7 +56,7 @@ METHOD_NAMES = {
 
 
 def cook(scriptOp):
-    osc = op('oscin1')
+    osc = op('osc')
 
     # --- heartbeat ---
     try:
@@ -80,7 +80,7 @@ def cook(scriptOp):
     # --- method id from state CHOP (optional) ---
     method_id = 0
     try:
-        method_id = int(op('state1')['method_id'][0])
+        method_id = int(op('state')['method_id'][0])
     except Exception:
         pass
 

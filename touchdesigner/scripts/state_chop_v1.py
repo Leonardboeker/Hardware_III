@@ -28,7 +28,7 @@ def cook(scriptOp):
     scriptOp.appendChan('method_id')
     scriptOp.appendChan('hb_alive')
 
-    osc = op('oscin1')
+    osc = op('osc')
 
     # heartbeat
     try:
@@ -54,7 +54,7 @@ def cook(scriptOp):
     # method id from serial DAT storage (written by serial_rfid_v1 callbacks)
     method_id = 0
     try:
-        method_id = int(op('serial1').fetch('method_id', 0))
+        method_id = int(op('rfid').fetch('method_id', 0))
     except Exception:
         pass
 

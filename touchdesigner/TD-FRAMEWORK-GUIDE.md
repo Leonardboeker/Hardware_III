@@ -3,50 +3,65 @@
 Build this network from scratch in `vertical-slice.toe` (or a new .toe).  
 TD build: **2025.32050** — do not upgrade mid-project.
 
+## Node naming convention
+
+Short names that say what the node **does**, not what type it is:
+
+| TD Node name | Type | Role |
+|---|---|---|
+| `osc` | OSC In CHOP | receives puck positions from vision pipeline |
+| `rfid` | Serial DAT | receives RFID tag scans from ESP32 |
+| `state` | Script CHOP | aggregates all state into 4 channels |
+| `viz` | Script TOP | renders the 1280×720 projection image |
+| `stats` | Text TOP | stats text overlay |
+| `comp` | Over TOP | composites viz + stats |
+| `out` | Window COMP | projector output |
+
 ---
 
 ## Architecture overview
 
 ```
-oscin1  ───────────────────────────────────┐
-                                           ▼
-serial1 (Serial DAT) ──► state1 (Script CHOP) ──► script_viz1 (Script TOP)
-  └── serial_rfid_v1.py    state_chop_v1.py         footprint_viz_v5.py
-                                                          │
-                                           text_stats1 (Text TOP)
-                                                          │
-                                               over1 (Over TOP)
-                                                          │
-                                              window1 (Window COMP)
+osc  ────────────────────────────┐
+                                 ▼
+rfid ──► state (Script CHOP) ──► viz (Script TOP)
+  └── serial_rfid_v1.py   state_chop_v1.py    footprint_viz_v5.py
+                                 │
+                         stats (Text TOP)
+                                 │
+                          comp (Over TOP)
+                                 │
+                          out (Window COMP)
 ```
 
 ---
 
 ## Step 1 — Clean up old nodes
 
-Delete any of these if they exist from the previous session:
-- `switch1`
-- `script2` (old Script CHOP with only puck_count/area)
-- `text1` (old Text TOP with broken expression)
+Delete if they exist from the previous session:
+- `switch1`, `script1`, `script2`, `text1`, `over1` (all replaced by new names above)
 
-Keep: `oscin1`, `script1` (Script TOP), `over1`, `window1`.
+Keep: `oscin1` (rename it to `osc`), `window1` (rename to `out`).
+
+To rename a node: double-click its name label in the network editor.
 
 ---
 
-## Step 2 — OSC In CHOP (`oscin1`)
+## Step 2 — `osc` — OSC In CHOP
 
-Already exists. Verify settings:
+Already exists as `oscin1`. Rename it to `osc`.
+
+Verify settings:
 - **Protocol** → UDP
 - **Port** → 7000
 - **Active** → On
 
 ---
 
-## Step 3 — Serial DAT (`serial1`)
+## Step 3 — `rfid` — Serial DAT
 
-Add → DAT → Serial
+Add → DAT → Serial → rename to `rfid`
 
-Parameters:
 | Parameter | Value |
 |-----------|-------|
 | Port | your ESP32 COM port (e.g. COM5) |
@@ -56,123 +71,107 @@ Parameters:
 | Stop Bits | 1 |
 | Active | On |
 
-Callbacks DAT:
-1. Right-click `serial1` → **Edit Callbacks**
-2. Paste the entire contents of `touchdesigner/scripts/serial_rfid_v1.py` into the DAT.
-3. Update `RFID_TO_METHOD` dict with your actual RFID tag IDs (printed to Textport on first scan).
+Callbacks:
+1. Right-click `rfid` → **Edit Callbacks**
+2. Paste contents of `touchdesigner/scripts/serial_rfid_v1.py`
+3. Update `RFID_TO_METHOD` with your actual tag IDs (shown in Textport on first scan)
 
-> **No ESP32 yet?** Leave `serial1` inactive. `state1` will default `method_id = 0`.
+> **No ESP32 yet?** Leave `rfid` inactive — `state` defaults `method_id = 0`.
 
 ---
 
-## Step 4 — State CHOP (`state1`)
+## Step 4 — `state` — Script CHOP
 
-Add → CHOP → Script
+Add → CHOP → Script → rename to `state`
 
 1. Right-click → **Edit Script**
 2. Paste contents of `touchdesigner/scripts/state_chop_v1.py`
-3. Set **Cook Type** → Every Frame
+3. **Cook Type** → Every Frame
 
-Outputs 4 channels: `puck_count`, `area_px2`, `method_id`, `hb_alive`
+Output channels: `puck_count`, `area_px2`, `method_id`, `hb_alive`
+
+> The script references `op('osc')` and `op('rfid')` by name — make sure both nodes are named exactly that.
 
 ---
 
-## Step 5 — Main Visualization (`script_viz1`)
+## Step 5 — `viz` — Script TOP
 
-Replace the old `script1` Script TOP or add a new one.
-
-Add → TOP → Script
+Add → TOP → Script → rename to `viz`
 
 1. Right-click → **Edit Script**
 2. Paste contents of `touchdesigner/scripts/footprint_viz_v5.py`
-3. Set resolution to **1280 × 720** in the Script TOP parameters
-4. Set **Cook Type** → Every Frame
+3. Resolution: **1280 × 720**
+4. **Cook Type** → Every Frame
 
-The script reads `oscin1` and `state1` directly by name — no wire connections needed for data.
+> References `op('osc')` and `op('state')` by name.
 
 ---
 
-## Step 6 — Stats text overlay (`text_stats1`)
+## Step 6 — `stats` — Text TOP
 
-Add → TOP → Text
+Add → TOP → Text → rename to `stats`
 
-**Text** parameter (Expression mode — click the `=` button):
+**Text** parameter — click `=` to switch to Expression mode:
 
 ```python
-'Pucks: ' + str(int(op('state1')['puck_count'][0])) + '   Area: ' + str(int(op('state1')['area_px2'][0])) + ' px²   ' + ['OFFLINE','LIVE'][int(op('state1')['hb_alive'][0])]
+'Pucks: ' + str(int(op('state')['puck_count'][0])) + '   Area: ' + str(int(op('state')['area_px2'][0])) + ' px²   ' + ['OFFLINE','LIVE'][int(op('state')['hb_alive'][0])]
 ```
 
-Parameters:
 | Parameter | Value |
 |-----------|-------|
 | Font Size | 28 |
-| Color | white (1,1,1,1) |
+| Color | 1, 1, 1, 1 (white) |
 | Horizontal Align | Left |
 | Resolution | 1280 × 180 |
-| Extend (outside image) | Black |
 
 ---
 
-## Step 7 — Composite (`over1`)
+## Step 7 — `comp` — Over TOP
 
-Add → TOP → Over
+Add → TOP → Over → rename to `comp`
 
-- Input 1: `script_viz1`
-- Input 2: `text_stats1`
+- Input 1: `viz`
+- Input 2: `stats`
 
-In the Over TOP parameters, set the **Translate Y** of input 2 to **-270** (moves text to the bottom 180px strip of the 720px frame).
-
-Actually, the easier way: use a **Layout TOP** instead of Over:
-
-Add → TOP → Layout
-- Input 1 (top area): `script_viz1`  
-- Input 2 (bottom strip): `text_stats1`
-
-Set Layout mode to **Vertical**, heights 540 / 180.
+In Over parameters → **Translate Y** of input 2: `-270`  
+(shifts the 180px text strip to the bottom of the 720px frame)
 
 ---
 
-## Step 8 — Projector output (`window1`)
+## Step 8 — `out` — Window COMP
 
-Already exists. Connect:
-`over1` (or `layout1`) → `window1`
+Rename existing `window1` to `out`. Connect: `comp` → `out`
 
-Window parameters:
 | Parameter | Value |
 |-----------|-------|
 | Resolution | 1280 × 720 |
-| Perform Mode | On (for actual projection) |
-| Monitor | your projector display index |
+| Monitor | projector display index |
 
-To preview without a projector: set **Open** → On in the Window COMP.
+To preview without projector: **Open** → On
 
 ---
 
 ## Data flow summary
 
-| Source | Operator | What it provides |
-|--------|----------|-----------------|
-| Vision Python pipeline | `oscin1` | Per-puck positions + heartbeat |
-| ESP32/RFID | `serial1` + `serial_rfid_v1.py` | `method_id` stored on DAT |
-| — | `state1` (Script CHOP) | `puck_count`, `area_px2`, `method_id`, `hb_alive` |
-| — | `script_viz1` (Script TOP) | 1280×720 footprint render |
-| — | `text_stats1` (Text TOP) | Stats overlay text |
-| — | `over1` / `layout1` | Composited frame |
-| — | `window1` | Projected output |
+| Node | Type | Reads from | Provides |
+|------|------|-----------|----------|
+| `osc` | OSC In CHOP | vision pipeline (port 7000) | puck positions + heartbeat |
+| `rfid` | Serial DAT | ESP32 (USB serial) | RFID tag → method_id |
+| `state` | Script CHOP | `osc`, `rfid` | puck_count, area_px2, method_id, hb_alive |
+| `viz` | Script TOP | `osc`, `state` | 1280×720 render |
+| `stats` | Text TOP | `state` | stats string |
+| `comp` | Over TOP | `viz`, `stats` | composited frame |
+| `out` | Window COMP | `comp` | projector |
 
 ---
 
 ## Running the full pipeline
 
 ```bash
-# Terminal 1 — vision pipeline
 python -m vision.src.run_vertical_slice \
   --camera 0 \
   --intrinsics vision/calibration/camera_intrinsics.yml \
   --homography vision/calibration/homography.yml
-
-# TouchDesigner — open vertical-slice.toe
-# Scan an RFID tag → Textport shows the tag ID → add to serial_rfid_v1.py
 ```
 
 ---
@@ -180,6 +179,6 @@ python -m vision.src.run_vertical_slice \
 ## Adding a new construction method
 
 1. Add entry to `data/methods_db.json`
-2. Add `METHOD_COLORS` and `METHOD_NAMES` entries in `footprint_viz_v5.py`
-3. Add RFID tag mapping in `serial_rfid_v1.py` → `RFID_TO_METHOD`
-4. Re-paste updated scripts into their respective Script OPs in TD
+2. Add color + name in `footprint_viz_v5.py` → `METHOD_COLORS` / `METHOD_NAMES`
+3. Add RFID tag in `serial_rfid_v1.py` → `RFID_TO_METHOD`
+4. Re-paste updated scripts into `viz` and `rfid` Script OPs in TD
