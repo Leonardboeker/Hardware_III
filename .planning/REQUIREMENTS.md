@@ -25,21 +25,21 @@
 
 ### FSM & System Logic (Session 3 - May 4)
 
-- [ ] **FSM-01**: FSM diagram complete (states: IDLE, READY, CHECKING, CONFIRMED, ERROR, COMPLETE minimum)
+- [ ] **FSM-01**: FSM diagram complete for the canonical content FSM (`IDLE`, `METHOD`, `FOOTPRINT`, `HEIGHT`, `MATERIALS`, `VALIDATED`, `PHASE_N`, `COMPARISON`) with wrapper and visual states documented separately
 - [ ] **FSM-02**: All states have defined projection outputs (what light does in each state)
 - [ ] **FSM-03**: All transitions labeled with trigger (sensor event, timer, gesture)
-- [ ] **FSM-04**: FSM implemented in Grasshopper using Anemone
+- [ ] **FSM-04**: FSM implemented in TouchDesigner using the locked canonical content FSM
 - [ ] **FSM-05**: Rule format applied: IF [condition] -> THEN IN STATE [name]
 
 ### Sensor & Input Pipeline (Session 3-4)
 
-- [ ] **INP-01**: Sensor/webcam connected and streaming data into Grasshopper via Firefly
+- [ ] **INP-01**: Sensor/webcam connected and streaming interpreted data into TouchDesigner (OpenCV / ArUco -> OSC -> TouchDesigner or equivalent)
 - [ ] **INP-02**: Human input mapped to fabrication parameter (mapping function defined: direct/juicy/stepped)
 - [ ] **INP-03**: Input triggers correct FSM state transitions in real time
 
 ### Human-in-the-Loop Assembly (Session 4 - May 11)
 
-- [ ] **HITL-01**: System cannot advance past CHECKING state without valid human placement
+- [ ] **HITL-01**: System cannot advance past the current canonical content step without valid human placement confirmed by the sensing pipeline
 - [ ] **HITL-02**: System provides spatial feedback within 150ms of placement
 - [ ] **HITL-03**: Error recovery: wrong placement -> system guides correction without reset
 - [ ] **HITL-04**: Assembly sequence defined (which module comes next, in what order)
