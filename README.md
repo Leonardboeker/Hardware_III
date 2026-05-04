@@ -110,24 +110,29 @@ Value (0–4) to switch construction methods.
 
 ```
 README.md                    — this file
+CONTRIBUTING.md              — repo conventions
 INTERFACE_CONTRACT.md        — system-level data flow between subsystems
 vertical-slice.toe           — main TouchDesigner project file
 
 .planning/                   — project plan, FSM spec, roadmap, requirements
-archive/                     — historical proposals, FSM drafts, slides
+archive/                     — historical proposals, FSM drafts, slides (v1, v2)
 cad/                         — 3D-printable parts (pucks, models, mounts)
   rhino/                     — Rhino + Grasshopper geometry sources
   aruco-markers/             — generated marker PNGs for printing
 data/                        — JSON databases (methods_db.json, etc.)
 deliverables/                — submission-ready artifacts
 docs/                        — design notes, meeting records, research
+  fsm/, meetings/            — internal docs
   research/, research_2/     — literature reviews + per-method research
+  Data_Field.odt             — data-field spec (collaborator working doc)
 firmware/                    — ESP32 firmware + sensor integration spec
 media/                       — heavy reference assets
-reference/                   — course syllabus + slides
+reference/                   — course syllabus, slides, literature notes
 touchdesigner/
   scripts/                   — Python scripts pasted into Script OPs
   TD-FRAMEWORK-GUIDE.md      — step-by-step network build guide
+  ERROR-FEEDBACK-SPEC.md     — visual feedback codes
+  VERTICAL-SLICE-RUNBOOK.md  — run/test instructions
 vision/
   src/                       — Python CV pipeline (ArUco detect, OSC send)
   calibration/               — camera/projector calibration files
