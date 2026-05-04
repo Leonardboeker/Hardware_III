@@ -4,6 +4,13 @@
 **Deadline:** April 17, 2026
 **Requirements:** S1-01, S1-02, S1-03, S1-04
 
+> Historical note:
+> This file records the original Phase 1 submission plan.
+> Its paper-FSM tasks reflect an earlier proposal-stage state sketch.
+> The current canonical TouchDesigner runtime FSM is now:
+> `IDLE -> METHOD -> FOOTPRINT -> HEIGHT -> MATERIALS -> VALIDATED -> PHASE_N -> COMPARISON`
+> See [PROJECT.md](/o:/Hardware_III/.planning/PROJECT.md), [ROADMAP.md](/o:/Hardware_III/.planning/ROADMAP.md), and [fsm_full.py](/o:/Hardware_III/touchdesigner/scripts/fsm_full.py).
+
 ---
 
 ## Tasks
