@@ -99,10 +99,22 @@ def detect_pucks_in_projector_coords(
 
 
 def open_camera(device_index: int = 0, width: int = 1920, height: int = 1080) -> cv2.VideoCapture:
-    cap = cv2.VideoCapture(device_index)
+    # Try multiple backends — needed on Windows where MSMF blocks index-based access
+    backends = [cv2.CAP_ANY, cv2.CAP_DSHOW, cv2.CAP_MSMF]
+    cap = None
+    for backend in backends:
+        c = cv2.VideoCapture(device_index, backend)
+        if c.isOpened():
+            cap = c
+            print(f"[INFO] Opened camera {device_index} with backend {backend}")
+            break
+        c.release()
+    if cap is None:
+        raise RuntimeError(
+            f"Cannot open camera device {device_index}. "
+            "Try a different --camera index or check device manager."
+        )
     cap.set(cv2.CAP_PROP_FRAME_WIDTH, width)
     cap.set(cv2.CAP_PROP_FRAME_HEIGHT, height)
-    cap.set(cv2.CAP_PROP_AUTOFOCUS, 0)  # disable autofocus — keep focus locked
-    if not cap.isOpened():
-        raise RuntimeError(f"Cannot open camera device {device_index}")
+    cap.set(cv2.CAP_PROP_AUTOFOCUS, 0)
     return cap
