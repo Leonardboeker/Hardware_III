@@ -1,95 +1,116 @@
-# Hardware III — Guided Comparative Assembly Installation
+# Hardware III - Guided Comparative Assembly
 
-**Course:** Hardware III — Human-in-the-Loop: Interactive Systems
-**Institute:** IAAC, MRAC + MAAI 2025/2026
-**Instructors:** Hamid Peiro, Aleksandra Kraeva
-**Schedule:** April 10 – May 22, 2026
-**Team:** Leo, Elais, Rafik, Seid, Onur, Nithik
-
----
+**Course:** Hardware III - Human-in-the-Loop Interactive Systems  
+**Institute:** IAAC, MRAC + MAAI 2025/2026  
+**Runtime:** TouchDesigner  
+**Project mode:** Interactive construction decision exhibit
 
 ## Mission
 
-> "We compare different statistics of the housing construction industry and display them through an interactive exhibit."
+We compare construction methods by letting people physically configure a small building scenario on a table and immediately see the environmental, labor, time, and economic consequences through projection.
 
-## Concept
+## Core Interaction
 
-An interactive table installation where the user physically assembles 2–3 scale models of the same object — each built using a different construction method (e.g. traditional masonry, 3D-printed concrete, modular prefabrication).
+The visitor selects a construction method, configures the footprint, sets the height, selects the material logic, validates the scenario, moves through five construction phases, and finally reaches a comparison view.
 
-A projector guides every assembly step. As each piece is placed, production data is mapped directly onto the object: CO₂ consumption, labor hours, material origin. Once all models are complete, a full comparison is projected across the table.
+## Canonical State Model
 
-**The point:** Instead of reading abstract statistics, you build the comparison yourself — piece by piece. The data becomes physical.
+The repo uses a **layered state model**.
+These layers should not be collapsed into one list.
 
----
+### Canonical Content FSM
 
-## How It Works
+This is the main visitor-facing interaction flow and the **canonical FSM** for the project:
 
-1. Projector highlights where to place the next piece
-2. User places the physical piece on the table
-3. Camera confirms correct placement
-4. Data is projected onto the piece: CO₂, labor hours, production method
-5. Next piece is highlighted → repeat until model complete
-6. Move to next construction method → build again
-7. All models complete → full comparison projected side by side
-
----
-
-## FSM States
-
-```
-IDLE → GUIDING → CHECKING → CONFIRMED → NEXT_PIECE
-                     ↓
-                   ERROR (wrong placement → ghost guide shown)
-
-CONFIRMED (last piece) → MODEL_COMPLETE → NEXT_MODEL → GUIDING
-NEXT_MODEL (last model) → COMPARISON → IDLE
+```text
+IDLE
+  ->
+METHOD
+  ->
+FOOTPRINT
+  ->
+HEIGHT
+  ->
+MATERIALS
+  ->
+VALIDATED
+  ->
+PHASE_N
+  ->
+COMPARISON
 ```
 
----
+`PHASE_N` is the implementation state used in TouchDesigner for the five locked construction phases:
+- Foundation
+- Structure / Walls
+- Roof
+- Openings
+- Finishing
+
+This canonical content FSM is the one currently reflected in:
+- [PROJECT.md](/o:/Hardware_III/.planning/PROJECT.md)
+- [ROADMAP.md](/o:/Hardware_III/.planning/ROADMAP.md)
+- [fsm_full.py](/o:/Hardware_III/touchdesigner/scripts/fsm_full.py)
+
+### System Wrapper States
+
+These are **system-level modes**, not the main content FSM:
+- `CALIBRATION_CHECK`
+- `ERROR`
+- `RESET`
+- `MANUAL_OVERRIDE`
+
+They handle setup, recovery, and operator control around the content FSM.
+
+### Visual Feedback States
+
+These are **projection feedback codes**, not the canonical content FSM:
+- `DISCONNECTED`
+- `PENDING`
+- `INVALID`
+- `VALID`
+- `IDLE_ANIM`
+- `SUMMARY`
+- `COMPARISON`
+
+These are defined by the current TouchDesigner visual layer and error feedback logic in:
+- [ERROR-FEEDBACK-SPEC.md](/o:/Hardware_III/touchdesigner/ERROR-FEEDBACK-SPEC.md)
+- [fsm_full.py](/o:/Hardware_III/touchdesigner/scripts/fsm_full.py)
+
+## Current Runtime Direction
+
+TouchDesigner is the main runtime for:
+- FSM logic
+- computer vision intake
+- projection mapping
+- visual state output
+- data triggering
+
+Rhino + Grasshopper remain part of the project for:
+- geometry authoring
+- fabrication preparation
+- offline design support
 
 ## Tech Stack
 
 | Tool | Role |
 |------|------|
-| Rhino + Grasshopper | Main logic environment |
-| Anemone (GH plugin) | FSM loop logic |
-| Firefly (GH plugin) | Webcam/sensor → Grasshopper data stream |
-| TouchDesigner / HeavyM | Projection mapping + visual output |
-| Arduino / ESP32 | Proximity sensor (user leans in → data zoom) |
-| USB webcam (overhead) | Piece placement detection |
-| Video projector (top-down) | Guided projection on table + model surfaces |
+| TouchDesigner | Primary runtime: FSM, projection, integration |
+| OpenCV + ArUco | Marker detection and vision pipeline |
+| Rhino + Grasshopper | Geometry, fabrication logic, offline authoring |
+| ESP32 / RFID / proximity sensor | Presence, method selection, hardware triggers |
+| Overhead webcam | ArUco tracking |
+| Projector | Table projection and visual feedback |
 
----
+## Source Of Truth
 
-## Project Structure
+When there is a mismatch between older documents, use this order:
 
-```
-.planning/
-  PROJECT.md              — Full project context and concept
-  REQUIREMENTS.md         — All requirements (S1–Finals)
-  ROADMAP.md              — Phase breakdown with goals and success criteria
-  STATE.md                — Current phase and progress
-  phases/
-    01-proposal-fsm-foundation/
-      PLAN.md             — Phase 1 tasks (due April 17)
-```
+1. [fsm_full.py](/o:/Hardware_III/touchdesigner/scripts/fsm_full.py)
+2. [PROJECT.md](/o:/Hardware_III/.planning/PROJECT.md)
+3. [ROADMAP.md](/o:/Hardware_III/.planning/ROADMAP.md)
+4. [INTERFACE_CONTRACT.md](/o:/Hardware_III/INTERFACE_CONTRACT.md)
+5. [FSM_TOUCHDESIGNER_SPEC.md](/o:/Hardware_III/.planning/FSM_TOUCHDESIGNER_SPEC.md)
 
----
-
-## Phases
-
-| Phase | Goal | Deadline |
-|-------|------|----------|
-| 1 — Proposal & FSM Foundation | Submit S1 deliverables, lock concept | April 17 |
-| 2 — Data Research & Physical Model Design | Source CO₂/labor data, fabricate model parts | May 4 |
-| 3 — FSM Implementation & Assembly Logic | Full FSM in Anemone, piece detection pipeline | May 4 |
-| 4 — Human-in-the-Loop Assembly & Sound | Guided loop for 2+ methods, sound layer | May 11 |
-| 5 — Projection Mapping & Comparison View | Projector calibrated, comparison statistics | May 18 |
-| 6 — Integration, Testing & Finals | Reliable end-to-end demo | May 22 |
-
----
-
-## Key Reference
-
-Stefana Parascho — *Cooperative Robotic Assembly* (ETH Diss. 25839)
-Assembly sequence as FSM: each intermediate state must be structurally valid before the next step is permitted. Directly maps to guided piece-by-piece placement in this installation.
+Older Phase 1 documents may still contain historical FSM sketches such as `GUIDING`, `CHECKING`, `NEXT_PIECE`, or older Grasshopper / Anemone assumptions.
+Those should be treated as proposal history, not as the current runtime definition.
