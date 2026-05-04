@@ -49,6 +49,22 @@ IDLE → METHOD → FOOTPRINT → HEIGHT → MATERIALS → VALIDATED → 5 PHASE
 - **5 PHASES**: Foundation → Structure → Roof → Openings → Finishing (animated, data per phase)
 - **COMPARISON**: All data saved, side-by-side dashboard projected
 
+## Layered State Model (current runtime interpretation)
+
+The project now distinguishes three state layers:
+
+1. **Canonical Content FSM**
+   `IDLE -> METHOD -> FOOTPRINT -> HEIGHT -> MATERIALS -> VALIDATED -> PHASE_N -> COMPARISON`
+2. **System Wrapper States**
+   `CALIBRATION_CHECK`, `ERROR`, `RESET`, `MANUAL_OVERRIDE`
+3. **Visual Feedback States**
+   `DISCONNECTED`, `PENDING`, `INVALID`, `VALID`, `IDLE_ANIM`, `SUMMARY`, `COMPARISON`
+
+The current TouchDesigner runtime should keep these layers separate.
+The visitor-facing journey is the canonical content FSM.
+Recovery and setup belong to wrapper states.
+Projection feedback belongs to visual states.
+
 ## Building Phases (locked)
 
 | Phase | Name |

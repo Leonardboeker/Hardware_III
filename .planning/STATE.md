@@ -21,6 +21,9 @@ See: `.planning/PROJECT.md` (updated 2026-05-03)
 **Core value:** Working interactive prototype where projection guides closed-loop comparative assembly in real time, with LCA data — including methodology wobble — overlaid per phase.
 **Current focus:** Phase 2 — Data Research & Physical Model Design (deadline May 4, 2026 — TOMORROW)
 
+**Canonical state model:** `IDLE -> METHOD -> FOOTPRINT -> HEIGHT -> MATERIALS -> VALIDATED -> PHASE_N -> COMPARISON`
+**State layering:** wrapper states and visual feedback states are tracked separately from the canonical content FSM.
+
 ## Current Phase
 
 **Phase 2** — Data Research & Physical Model Design
