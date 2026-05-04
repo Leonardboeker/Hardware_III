@@ -399,6 +399,22 @@ It already supports:
 - `reset_signal` must override everything and clear the session
 - `sensor_online` is a health flag, not a content-state trigger
 
+### Current firmware-side OSC direction
+
+The dedicated ESP32 sensor spec now lives in:
+- [ESP32-SENSOR-SYSTEM.md](/o:/Hardware_III/firmware/esp32-integration/ESP32-SENSOR-SYSTEM.md)
+
+Current live message direction there is:
+- `/proximity/presence` -> maps to `user_present`
+- `/proximity/distance` -> maps to `proximity_value` after normalization if needed
+- `/esp32/heartbeat` -> maps to `sensor_online`
+- `/esp32/state_trigger` -> optional event/log channel
+- `/rfid/model` and `/rfid/method` -> method-selection inputs for the `METHOD` step
+
+Important alignment:
+- ESP32 presence does not create a separate canonical `ONBOARDING` state.
+- Presence supports idle engagement, timeout handling, and lean-in behavior around the canonical content FSM.
+
 ## 10. Rhino / Fabrication Contract
 
 The fabrication layer must provide:

@@ -12,7 +12,7 @@
 
 The ESP32-WROOM-32 microcontroller sits at the junction between the physical interaction layer and the software FSM. Its job is to:
 
-1. **Trigger user engagement** via proximity sensor (HC-SR04 ultrasonic or PIR) → initiates IDLE → ONBOARDING transition when user approaches
+1. **Trigger user engagement** via proximity sensor (HC-SR04 ultrasonic or PIR) → wakes idle visuals and marks the user as present while the canonical content FSM remains in `IDLE` until method selection begins
 2. **Detect user presence & absence** → maintains session active while user is present; triggers timeout/reset if user leaves for >30s
 3. **Identify construction method** via RFID reader (MFRC522) → tells TouchDesigner which model was placed on table
 4. **Stream sensor data** over WiFi/OSC to TouchDesigner at 50–100 Hz
@@ -20,6 +20,12 @@ The ESP32-WROOM-32 microcontroller sits at the junction between the physical int
 6. **Log all events** locally for debugging and post-demo analysis
 
 This document specifies the hardware, firmware architecture, OSC protocol, calibration procedure, QA checklist, and demo operation runbook.
+
+State-model alignment note:
+- The current project uses the layered TouchDesigner state model locked in the main repo.
+- ESP32 presence input does not create a separate `ONBOARDING` content state.
+- Presence supports idle engagement, timeout handling, and lean-in behavior around the canonical content FSM:
+  `IDLE -> METHOD -> FOOTPRINT -> HEIGHT -> MATERIALS -> VALIDATED -> PHASE_N -> COMPARISON`
 
 ---
 
@@ -129,7 +135,7 @@ SETUP
 LOOP (50–100 Hz, ~10–20ms per iteration)
   ├─ Measure HC-SR04 distance
   │  ├─ If distance < PROXIMITY_THRESHOLD → userPresent = true
-  │  │  └─ Send /proximity/presence 1 → triggers IDLE → ONBOARDING
+  │  │  └─ Send /proximity/presence 1 → wakes idle engagement and marks session active
   │  └─ If distance > ABSENCE_TIMEOUT_CM for >30s → userPresent = false
   │     └─ Send /proximity/presence 0 → triggers timeout/reset
   │
@@ -446,11 +452,11 @@ No user detected → /proximity/presence = 0
 ↓
 User approaches (distance < 30cm) → /proximity/presence = 1 + /esp32/state_trigger "user_entered"
 ↓
-(FSM transitions: IDLE → ONBOARDING)
+(Visual layer wakes from attract mode; content FSM remains in IDLE until method selection begins)
 ↓
 User places model → /rfid/model arrives
 ↓
-(FSM processes placement and validates)
+(METHOD-selection logic receives the event and continues the canonical content FSM)
 ↓
 User leaves (no proximity for 30s) → /proximity/presence = 0 + /esp32/state_trigger "user_left"
 ↓
@@ -497,7 +503,7 @@ OSC In CHOP
   Network Port: 9000
   
 Key inputs:
-  - /proximity/presence    → int {0, 1} — drives IDLE ↔ ONBOARDING transition
+  - /proximity/presence    → int {0, 1} — drives idle engagement, timeout handling, and optional lean-in behavior
   - /proximity/distance    → float [0, 400] — optional viz feedback (zoom on lean-in)
   - /rfid/model            → int {1, 2, 3} — identifies model for state validation
   - /esp32/state_trigger   → string — logs FSM events
@@ -510,17 +516,21 @@ Key inputs:
 # Pseudocode in TouchDesigner
 
 def onProximityChange(presence):
-    if presence == 1 and currentState == "IDLE":
-        triggerStateChange("ONBOARDING")
+    if presence == 1:
+        storeUserPresent(True)
+        if currentContentState == "IDLE":
+            setVisualFeedback("PENDING")
         playSound("user_entered")
-    elif presence == 0 and currentState != "IDLE":
+    elif presence == 0:
+        storeUserPresent(False)
         if timeInState > 30s:
-            triggerStateChange("RESET")
+            enterWrapperState("RESET")
             playSound("timeout")
 
 def onRFIDDetected(modelID):
-    if currentState == "ONBOARDING":
-        triggerStateChange("VALIDATING")
+    selectedMethod = lookupMethod(modelID)
+    storeSelectedMethod(selectedMethod)
+    if currentContentState in ("IDLE", "METHOD"):
         playSound("model_accepted")
 ```
 
@@ -604,7 +614,7 @@ Card UID: 11:22:33:44
    - Standing upright at table → ~60–80cm
    - Leaning in (face close to table) → ~20–40cm
    - User entering trigger zone → <30cm
-5. **Set `PROXIMITY_THRESHOLD_CM`** to 30cm (triggers ONBOARDING)
+5. **Set `PROXIMITY_THRESHOLD_CM`** to 30cm (wakes idle engagement / marks user present)
 6. **Set `USER_ABSENCE_TIMEOUT_MS`** to 30000 (30 seconds)
 7. **Test a few times** to confirm detection is smooth (not flickering on/off)
 

@@ -14,6 +14,14 @@ ui.toe            # any on-screen / side-display GUI
 main.toe          # composes the above as TOX components
 ```
 
+Key runtime scripts already in the repo:
+- `scripts/fsm_full.py` - canonical content FSM starter
+- `scripts/osc_handler.py` - vision OSC intake starter
+- `scripts/metrics_engine.py` - CSV-ready metrics engine starter
+
+Related integration spec:
+- `../firmware/esp32-integration/ESP32-SENSOR-SYSTEM.md` - ESP32 proximity, RFID, and OSC contract
+
 ## Read this before opening a .toe
 
 `.toe` files are **binary** — they don't merge. Coordinate in the group chat before opening one someone else is editing.
