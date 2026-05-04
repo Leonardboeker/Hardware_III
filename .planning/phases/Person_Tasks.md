@@ -62,6 +62,8 @@ Owns the overall system structure and makes sure all parts connect cleanly.
   - Physical model
   - Sensors / sound
 - Define interface contracts between team members.
+- Lock the scenario-to-metrics handoff between TouchDesigner and the data layer.
+- Coordinate the provisional metrics-engine integration before the research CSV files arrive.
 
 ### Must deliver
 - Final canonical FSM diagram.
@@ -69,16 +71,23 @@ Owns the overall system structure and makes sure all parts connect cleanly.
 - Visual feedback state definition.
 - Input contract from Computer Vision to TouchDesigner.
 - Output contract from FSM to Projection / Visuals.
+- Metrics layer contract:
+  - which scenario variables are required
+  - when the engine recomputes
+  - what the engine returns to TouchDesigner
 - Integration map.
 - Calibration checklist.
 - Demo runbook.
 - Fallback strategy.
+- Metrics-engine handoff checklist for Person 2 and Person 6.
 
 ### Key questions to answer
 - What is the current content state?
 - Is the system in a wrapper state?
 - What visual state should the projector show?
 - What input triggers the next state?
+- Which scenario variables are required before metrics can compute?
+- What happens if the CSV data is missing, partial, or delayed?
 - What happens if the system fails?
 - How do we run the final demo from start to finish?
 
@@ -92,6 +101,13 @@ Owns the actual interactive behavior inside TouchDesigner.
 - Publish visual feedback states separately from content states.
 - Receive normalized data from Computer Vision and sensors.
 - Convert interpreted inputs into state changes.
+- Publish normalized scenario values for the metrics layer:
+  - `area_m2`
+  - `number_of_floors`
+  - `shape_factor`
+  - `selected_material`
+  - `selected_program`
+  - `current_phase`
 - Manage timers, delays, confirmation windows, phase stepping, and reset logic.
 - Implement manual override buttons for demo safety.
 
@@ -133,6 +149,8 @@ Owns the actual interactive behavior inside TouchDesigner.
   - confidence
   - selected method
   - selected material
+  - area_m2
+  - number_of_floors
   - current phase index
   - error code
 - Manual controls:
@@ -349,6 +367,7 @@ Owns the construction data and the story of the project.
 
 ### Must deliver
 - CSV / table of values
+- CSV files that match the locked metrics schema in `data/README.md`
 - Data source list
 - Range-based comparison logic
 - Short UI text

@@ -247,8 +247,11 @@ This is what the FSM should send to the projection layer.
 - `co2_estimate`
 - `labor_hours`
 - `construction_time`
+- `material_origin`
 - `revenue_estimate`
 - `profit_estimate`
+- `phase_breakdown`
+- `data_status`
 - `confidence_display`
 - `sound_cue`
 - `log_event`
@@ -292,8 +295,11 @@ This is what the FSM should send to the projection layer.
 | `co2_estimate` | number or string | CO2 output or range | environmental overlays |
 | `labor_hours` | number or string | Labor output or range | labor display |
 | `construction_time` | number or string | Time output or range | timing bars |
+| `material_origin` | string or object | Origin summary or per-phase origin labels | supply-chain overlays |
 | `revenue_estimate` | number or string | Revenue output | business summary |
 | `profit_estimate` | number or string | Profit output | business summary |
+| `phase_breakdown` | object | Per-phase metric payload for detailed overlays | phase cards and debug panels |
+| `data_status` | string | Whether the metrics result is `ok`, `partial`, or `fallback` | trust and warning UI |
 | `confidence_display` | float | Debug confidence | operator panel |
 | `sound_cue` | string | Audio event token | sound routing |
 | `log_event` | string | Log line or state event | diagnostics |
@@ -337,10 +343,13 @@ It needs interpreted values.
 - `co2_estimate`
 - `labor_hours`
 - `construction_time`
+- `material_origin`
 - `revenue_estimate`
 - `profit_estimate`
 - `source_label`
 - `confidence_range`
+- `phase_breakdown`
+- `data_status`
 
 ### Example metrics table
 
@@ -354,6 +363,17 @@ It needs interpreted values.
 - Use ranges, not single unsupported numbers.
 - Every value must carry a source label.
 - Missing data must return null or error, not fake precision.
+
+### Current implementation direction
+
+The starter implementation for this layer now lives in:
+- [metrics_engine.py](/o:/Hardware_III/touchdesigner/scripts/metrics_engine.py)
+
+It already supports:
+- CSV loading from `data/methods/*.csv`
+- provisional fallback values while CSV files are still missing
+- TouchDesigner `fetch/store` integration
+- per-phase breakdowns plus total summary outputs
 
 ## 9. Sensor / ESP32 Input Contract
 
