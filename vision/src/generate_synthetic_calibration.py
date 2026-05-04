@@ -82,7 +82,7 @@ def main():
     with open(homography_path, "w") as f:
         yaml.dump(SYNTHETIC_HOMOGRAPHY, f, default_flow_style=False)
 
-    note_path.write_text(FALLBACK_NOTE)
+    note_path.write_text(FALLBACK_NOTE, encoding="utf-8")
 
     print(f"[OK] {intrinsics_path}")
     print(f"[OK] {homography_path}")
