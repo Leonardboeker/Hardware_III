@@ -1,14 +1,12 @@
-# Hardware III — Comparative Construction: Guided Assembly Installation
+# Hardware III — Guided Comparative Assembly
+
+**Subtitle:** An interactive construction kitchen — configure, build, compare.
+**Proposal submitted:** April 17, 2026 (`Group_3_Hardware_III_Proposal.pdf`)
 
 ## What This Is
 
-An interactive table installation at IAAC (MRAC + MAAI, 2025/2026).
-The user assembles 2–4 physical scale models of the same building/object,
-each representing a different construction method (traditional, 3D-printed, modular prefab, etc.).
-A projector guides each placement step and reveals real data at every piece:
-CO₂ consumption, labor hours, construction time, and method explanation.
-After all models are complete, a comparative statistics view is projected — making
-the environmental and economic differences tangible and visceral.
+A hands-on exhibit for children, young architects, and decision makers.
+The user configures a building (footprint, height, material) using physical ArUco pucks and dials on a table. A projector guides them through 5 construction phases — each with CO₂, cost, labor, and logistics data. Three construction methods can be compared: Masonry, 3D Printed, Prefab. No screens. No buttons.
 
 ## Core Value
 
@@ -36,38 +34,30 @@ you *build* the comparison yourself, piece by piece — the statistics emerge fr
 - Modular prefabrication / CLT
 - (Strong candidate) Reclaimed / reused brick — near-zero embodied carbon, outperforms 3DP on every metric, sharpens the political argument
 
-## FSM States
+## FSM States (locked in proposal)
 
 ```
-IDLE
-  → Object detected in zone → GUIDING
-
-GUIDING
-  → Piece placed correctly → CHECKING
-
-CHECKING (0.3s validation)
-  → Valid → CONFIRMED
-  → Invalid → ERROR (show ghost of correct position)
-
-CONFIRMED
-  → Show data layer (CO₂, hours, method)
-  → Timer / user lifts hand → NEXT_PIECE
-  → If last piece → MODEL_COMPLETE
-
-NEXT_PIECE
-  → Highlight next piece → GUIDING
-
-MODEL_COMPLETE
-  → Show model summary
-  → User picks up next model set → NEXT_MODEL
-
-NEXT_MODEL
-  → Reset projection for new method → GUIDING
-
-COMPARISON (all models complete)
-  → Full statistics projected
-  → Loop / reset after timeout → IDLE
+IDLE → METHOD → FOOTPRINT → HEIGHT → MATERIALS → VALIDATED → 5 PHASES → COMPARISON
 ```
+
+- **IDLE**: No model on pedestal
+- **METHOD**: RFID read → construction method selected (Masonry / 3D Printed / Prefab)
+- **FOOTPRINT**: User arranges 10 ArUco pucks → footprint + m² calculated
+- **HEIGHT**: User rotates ArUco dial (ID 10) → floors selected
+- **MATERIALS**: User rotates ArUco dial (ID 11) → material variant selected
+- **VALIDATED**: System checks feasibility (e.g. earth 3DP max 1 story) → green/red feedback
+- **5 PHASES**: Foundation → Structure → Roof → Openings → Finishing (animated, data per phase)
+- **COMPARISON**: All data saved, side-by-side dashboard projected
+
+## Building Phases (locked)
+
+| Phase | Name |
+|-------|------|
+| 1 | Foundation |
+| 2 | Structure / Walls |
+| 3 | Roof |
+| 4 | Openings (windows/doors) |
+| 5 | Finishing |
 
 ## Input / Sensing
 
@@ -84,12 +74,11 @@ COMPARISON (all models complete)
 
 ## Toolkit
 
-- Rhino + Grasshopper (main logic environment)
-- Firefly (GH plugin): webcam/Kinect → Grasshopper data stream
-- Anemone (GH plugin): FSM loop logic
-- TouchDesigner or HeavyM: projection mapping calibration + visual output
-- Arduino / ESP32: proximity sensor integration
-- USB webcam overhead + video projector (top-down or angled)
+- **TouchDesigner** — primary runtime (FSM, projection mapping, vision pipeline). Replaces Anemone/Firefly per locked decision (see below).
+- **OpenCV + ArUco** (Python or TD Script CHOP) — camera intake + marker detection
+- **Rhino + Grasshopper** — parametric geometry, building generation per method (no longer carries the FSM)
+- **Arduino / ESP32** — RFID pedestal + proximity sensor; OSC over WiFi to TouchDesigner
+- USB webcam overhead + top-down video projector
 
 ## Context
 
@@ -129,9 +118,11 @@ COMPARISON (all models complete)
 | Table projection (top-down) | Easier calibration, direct piece-to-data feedback | — Pending |
 | ArUco fiducial markers on pieces | Color detection unreliable under projector light | — Pending (recommended over color) |
 | Sound as equal layer to visuals | Ausstellungsbau background — content depth matters | — Pending |
-| Runtime: TouchDesigner vs GH/Anemone | GH is single-threaded; Anemone stalls canvas; webcam under projector light is fragile — TD does projection mapping + CV natively | — **Open — needs team decision** |
-| Build all 3 methods physically vs. 1 physical + 2 animated | 3 full builds = visitor fatigue risk | — **Open — needs team decision** |
-| LCA data as ranges (with sources) vs. single figures | Single EPD figures vary wildly and collapse under expert questioning | — **Open** |
+| Runtime: TouchDesigner vs GH/Anemone | GH is single-threaded; Anemone stalls canvas; webcam under projector light is fragile — TD does projection mapping + CV natively | **LOCKED 2026-05-03 — TouchDesigner** (lit-review strand 03) |
+| Build all 3 methods physically vs. 1 physical + 2 animated | 3 full builds = visitor fatigue risk | **LOCKED 2026-05-03 — projected animations**, AI-generated animations paused until LCA numbers sourced |
+| LCA data as ranges (with sources) vs. single figures | Single EPD figures vary wildly and collapse under expert questioning | **LOCKED 2026-05-03 — ranges + tier-annotated sources** + methodology-wobble overlay as first-class layer |
+| Closed-loop CV vs open-loop button-advance | Closed-loop is the project's novelty contribution; open-loop is a v1 baseline | **LOCKED 2026-05-03 — closed-loop from day one**, manual-override hotkey as emergency demo insurance only |
+| Reclaimed brick: 4th competitor vs baseline toggle | A reuse-vs-new bake-off is foregone-conclusion theater | **LOCKED 2026-05-03 — baseline toggle**, frames every other method against it |
 
 ## Open Critiques (from S1 peer review — address in proposal)
 
@@ -144,4 +135,16 @@ COMPARISON (all models complete)
 See `.planning/REVIEW-S1.md` for full critique, additions, and references.
 
 ---
-*Last updated: 2026-04-13 — S1 peer review integrated*
+
+## Locked decisions (2026-05-03)
+
+These five positions are taken — backed by the literature review at `docs/research/lit-review/`. They supersede any earlier "Open" entries above. Cited rationale lives in `docs/research/lit-review/ACTIONS.md`.
+
+1. **Closed-loop computer vision from day one.** Every FSM transition is gated by camera confirmation against a projected target.
+2. **TouchDesigner is the runtime.** Replaces Anemone (FSM) and Firefly (vision intake) from the original toolkit.
+3. **Reclaimed brick is a baseline toggle**, not a 4th competitor.
+4. **Methodology-wobble is a first-class projection layer**, not a footnote.
+5. **AI-generated phase animations paused** until tier-1 LCA numbers are sourced (Catalonia: CYPE / BEDEC / ITeC / EPDs).
+
+---
+*Last updated: 2026-05-03 — toolkit + key decisions realigned to lit-review-backed locked positions*

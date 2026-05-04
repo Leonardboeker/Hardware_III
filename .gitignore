@@ -1,0 +1,45 @@
+# OS
+Thumbs.db
+desktop.ini
+.DS_Store
+
+# Editors / IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+venv/
+.venv/
+env/
+*.egg-info/
+
+# TouchDesigner
+# Incremental backups TD makes next to the live .toe — never commit these.
+*.toe.[0-9]*
+Backup/
+# Per-machine local paths / temp output
+local/
+
+# Rhino
+*.3dmbak
+*.rhl
+
+# Secrets
+.env
+.env.local
+*.key
+*.pem
+
+# Build / output
+dist/
+build/
+*.log
+
+# Large binaries — review before adding (consider Git LFS if >50MB)
+# *.mp4
+# *.mov
