@@ -1,6 +1,7 @@
-"""ESP32 RFID Serial DAT callbacks — v1.
+"""rfid_in — Serial DAT callbacks (real hardware path).
 
-Paste this into the Serial DAT's "Callbacks DAT" field in TD.
+Use this ONLY when the ESP32 + RFID reader is physically connected.
+For now (no hardware), use a Constant CHOP named 'rfid_in' instead.
 
 ESP32 firmware sends one line per tag scan over USB serial (115200 baud):
     RFID:<8-char-hex-id>
@@ -8,7 +9,7 @@ Example:
     RFID:A1B2C3D4
 
 The callback maps the tag to a method_id and stores it on the DAT so that
-state_chop_v1.py can read it via  op('serial1').fetch('method_id', 0).
+compute_state can read it via op('rfid_in').fetch('method_id', 0).
 
 To add tags: scan each physical tag, note the hex ID printed to the TD
 Textport, and add it to RFID_TO_METHOD below.

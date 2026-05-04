@@ -1,121 +1,115 @@
 # TouchDesigner Framework Setup Guide
 
-Build this network from scratch in `vertical-slice.toe` (or a new .toe).  
+Build this network in `vertical-slice.toe`.  
 TD build: **2025.32050** — do not upgrade mid-project.
+
+---
 
 ## Node naming convention
 
-Short names that say what the node **does**, not what type it is:
+Names describe **what the node does**, not its operator type:
 
-| TD Node name | Type | Role |
-|---|---|---|
-| `cam` | OSC In CHOP | receives puck positions from vision pipeline |
-| `rfid` | Serial DAT | receives RFID tag scans from ESP32 |
-| `state` | Script CHOP | aggregates all state into 4 channels |
-| `viz` | Script TOP | renders the 1280×720 projection image |
-| `stats` | Text TOP | stats text overlay |
-| `comp` | Over TOP | composites viz + stats |
-| `out` | Window COMP | projector output |
+| Node name | Type | Role |
+|-----------|------|------|
+| `vision_in`        | OSC In CHOP    | OSC data from OpenCV pipeline (puck positions + heartbeat) |
+| `rfid_in`          | Constant CHOP (stub) → Serial DAT (real) | construction method selector |
+| `compute_state`    | Script CHOP    | aggregates puck_count, area, method_id, hb_alive |
+| `render_footprint` | Script TOP     | renders the 1280×720 projection image |
+| `stats_text`       | Text TOP       | text overlay (Pucks / Area / Status) |
+| `compose_final`    | Over TOP       | merges render_footprint + stats_text |
+| `projector_out`    | Window COMP    | sends image to the projector |
 
 ---
 
-## Architecture overview
+## Architecture
 
 ```
-cam  ────────────────────────────┐
-                                 ▼
-rfid ──► state (Script CHOP) ──► viz (Script TOP)
-  └── serial_rfid_v1.py   state_chop_v1.py    footprint_viz_v5.py
-                                 │
-                         stats (Text TOP)
-                                 │
-                          comp (Over TOP)
-                                 │
-                          out (Window COMP)
+vision_in ─────────┐
+                   ├──► compute_state ──► render_footprint ──┐
+rfid_in   ─────────┘                                         ├──► compose_final ──► projector_out
+                              │                              │
+                              └──► stats_text ───────────────┘
 ```
 
 ---
 
-## Step 1 — Clean up old nodes
+## Step 0 — Clean up old nodes
 
-Delete if they exist from the previous session:
-- `switch1`, `script1`, `script2`, `text1`, `over1` (all replaced by new names above)
+Delete (right-click → Delete):
+- `script1`, `script2`, `script3` (and their `_callbacks` DATs)
+- `text1`, `over1`, `over2`, `transform1`
+- `select1`, `storage`
+- `disconnected`, `pending`, `invalid`, `valid` (FSM color blocks)
 
-Keep: `oscin1` (rename it to `cam`), `window1` (rename to `out`).
-
-To rename a node: double-click its name label in the network editor.
+Keep: `cam` (we'll rename it), `window1` (we'll rename it).
 
 ---
 
-## Step 2 — `cam` — OSC In CHOP
+## Step 1 — `vision_in` (OSC In CHOP)
 
-Already exists as `oscin1`. Rename it to `cam`.
+You already have this as `cam`. **Rename** it:
+- Double-click the name label `cam` → type `vision_in` → Enter
 
 Verify settings:
-- **Protocol** → UDP
-- **Port** → 7000
-- **Active** → On
-
----
-
-## Step 3 — `rfid` — Serial DAT
-
-Add → DAT → Serial → rename to `rfid`
-
 | Parameter | Value |
 |-----------|-------|
-| Port | your ESP32 COM port (e.g. COM5) |
-| Baud Rate | 115200 |
-| Data Bits | 8 |
-| Parity | None |
-| Stop Bits | 1 |
+| Protocol | UDP |
+| Port | 7000 |
 | Active | On |
 
-Callbacks:
-1. Right-click `rfid` → **Edit Callbacks**
-2. Paste contents of `touchdesigner/scripts/serial_rfid_v1.py`
-3. Update `RFID_TO_METHOD` with your actual tag IDs (shown in Textport on first scan)
+---
 
-> **No ESP32 yet?** Leave `rfid` inactive — `state` defaults `method_id = 0`.
+## Step 2 — `rfid_in` (stub: Constant CHOP)
+
+For now, fake the RFID input with a Constant CHOP. Later we replace it with a real Serial DAT when the ESP32 hardware is built.
+
+1. **Add → CHOP → Constant**
+2. Rename to `rfid_in`
+3. In parameters → **Channel 0**:
+   - **Name**: `method_id`
+   - **Value**: `0`
+
+To test methods later, manually change Value to 1, 2, 3, or 4 — the visualization will update its color.
 
 ---
 
-## Step 4 — `state` — Script CHOP
+## Step 3 — `compute_state` (Script CHOP)
 
-Add → CHOP → Script → rename to `state`
+1. **Add → CHOP → Script**
+2. Rename to `compute_state`
+3. Right-click → **Edit Script** → paste contents of [`touchdesigner/scripts/state_chop_v1.py`](scripts/state_chop_v1.py)
+4. Parameters → **Cook Type** → Every Frame
 
-1. Right-click → **Edit Script**
-2. Paste contents of `touchdesigner/scripts/state_chop_v1.py`
-3. **Cook Type** → Every Frame
+Outputs 4 channels: `puck_count`, `area_px2`, `method_id`, `hb_alive`
 
-Output channels: `puck_count`, `area_px2`, `method_id`, `hb_alive`
-
-> The script references `op('cam')` and `op('rfid')` by name — make sure both nodes are named exactly that.
-
----
-
-## Step 5 — `viz` — Script TOP
-
-Add → TOP → Script → rename to `viz`
-
-1. Right-click → **Edit Script**
-2. Paste contents of `touchdesigner/scripts/footprint_viz_v5.py`
-3. Resolution: **1280 × 720**
-4. **Cook Type** → Every Frame
-
-> References `op('cam')` and `op('state')` by name.
+> Reads `op('vision_in')` and `op('rfid_in')` by name — make sure both exist.
 
 ---
 
-## Step 6 — `stats` — Text TOP
+## Step 4 — `render_footprint` (Script TOP)
 
-Add → TOP → Text → rename to `stats`
+1. **Add → TOP → Script**
+2. Rename to `render_footprint`
+3. Right-click → **Edit Script** → paste contents of [`touchdesigner/scripts/footprint_viz_v5.py`](scripts/footprint_viz_v5.py)
+4. Parameters → **Common** → Resolution → **1280 × 720**
+5. Parameters → **Cook Type** → Every Frame
 
-**Text** parameter — click `=` to switch to Expression mode:
+> Reads `op('vision_in')` and `op('compute_state')` by name.
+
+---
+
+## Step 5 — `stats_text` (Text TOP)
+
+1. **Add → TOP → Text**
+2. Rename to `stats_text`
+3. Click the `=` button next to the **Text** parameter to switch to Expression mode
+4. Paste:
 
 ```python
-'Pucks: ' + str(int(op('state')['puck_count'][0])) + '   Area: ' + str(int(op('state')['area_px2'][0])) + ' px²   ' + ['OFFLINE','LIVE'][int(op('state')['hb_alive'][0])]
+'Pucks: ' + str(int(op('compute_state')['puck_count'][0])) + '   Area: ' + str(int(op('compute_state')['area_px2'][0])) + ' px²   ' + ['OFFLINE','LIVE'][int(op('compute_state')['hb_alive'][0])]
 ```
+
+5. Other params:
 
 | Parameter | Value |
 |-----------|-------|
@@ -126,59 +120,83 @@ Add → TOP → Text → rename to `stats`
 
 ---
 
-## Step 7 — `comp` — Over TOP
+## Step 6 — `compose_final` (Over TOP)
 
-Add → TOP → Over → rename to `comp`
-
-- Input 1: `viz`
-- Input 2: `stats`
-
-In Over parameters → **Translate Y** of input 2: `-270`  
-(shifts the 180px text strip to the bottom of the 720px frame)
+1. **Add → TOP → Over**
+2. Rename to `compose_final`
+3. Connect:
+   - Input 1: `render_footprint`
+   - Input 2: `stats_text`
+4. In Over parameters → **Translate** of Input 2:
+   - **ty** = `-270` (shifts the 180-px text strip to the bottom of the 720-px frame)
 
 ---
 
-## Step 8 — `out` — Window COMP
+## Step 7 — `projector_out` (Window COMP)
 
-Rename existing `window1` to `out`. Connect: `comp` → `out`
+Rename existing `window1` to `projector_out`. Connect:
+- `compose_final` → `projector_out`
 
 | Parameter | Value |
 |-----------|-------|
 | Resolution | 1280 × 720 |
-| Monitor | projector display index |
+| Monitor | projector display index (or 0 for primary) |
 
-To preview without projector: **Open** → On
-
----
-
-## Data flow summary
-
-| Node | Type | Reads from | Provides |
-|------|------|-----------|----------|
-| `cam` | OSC In CHOP | vision pipeline (port 7000) | puck positions + heartbeat |
-| `rfid` | Serial DAT | ESP32 (USB serial) | RFID tag → method_id |
-| `state` | Script CHOP | `cam`, `rfid` | puck_count, area_px2, method_id, hb_alive |
-| `viz` | Script TOP | `cam`, `state` | 1280×720 render |
-| `stats` | Text TOP | `state` | stats string |
-| `comp` | Over TOP | `viz`, `stats` | composited frame |
-| `out` | Window COMP | `comp` | projector |
+To preview without a projector: set **Open** → On in projector_out.
 
 ---
 
-## Running the full pipeline
+## Final layout check
 
-```bash
-python -m vision.src.run_vertical_slice \
-  --camera 0 \
-  --intrinsics vision/calibration/camera_intrinsics.yml \
-  --homography vision/calibration/homography.yml
 ```
+vision_in (OSC In CHOP, port 7000)
+rfid_in   (Constant CHOP, method_id = 0)
+                    │
+                    ▼
+            compute_state (Script CHOP)
+                    │
+        ┌───────────┴────────────┐
+        ▼                        ▼
+   render_footprint         stats_text
+   (Script TOP 1280×720)    (Text TOP, expression)
+        │                        │
+        └─────► compose_final ◄──┘
+                     │
+                     ▼
+              projector_out
+              (Window COMP)
+```
+
+---
+
+## Testing without hardware
+
+1. Run the vision pipeline:
+   ```bash
+   python -m vision.src.run_vertical_slice \
+     --camera 0 \
+     --intrinsics vision/calibration/synthetic_intrinsics.yml \
+     --homography vision/calibration/synthetic_homography.yml
+   ```
+2. Watch the puck markers move on the camera preview.
+3. In TD, change `rfid_in` → Channel 0 → Value (0–4) to switch construction methods. The polygon outline color in `render_footprint` should change.
+
+---
+
+## When the ESP32 + RFID hardware arrives
+
+Replace the `rfid_in` Constant CHOP with a Serial DAT:
+1. Delete `rfid_in` (the Constant CHOP)
+2. **Add → DAT → Serial**, rename to `rfid_in`
+3. Set **Port** = COM port, **Baud** = 115200, **Active** = On
+4. Right-click → **Edit Callbacks** → paste [`touchdesigner/scripts/serial_rfid_v1.py`](scripts/serial_rfid_v1.py)
+5. `compute_state` works with both — no script changes needed
 
 ---
 
 ## Adding a new construction method
 
-1. Add entry to `data/methods_db.json`
+1. Add entry to [`data/methods_db.json`](../data/methods_db.json)
 2. Add color + name in `footprint_viz_v5.py` → `METHOD_COLORS` / `METHOD_NAMES`
-3. Add RFID tag in `serial_rfid_v1.py` → `RFID_TO_METHOD`
-4. Re-paste updated scripts into `viz` and `rfid` Script OPs in TD
+3. Add RFID tag mapping in `serial_rfid_v1.py` → `RFID_TO_METHOD` (only when hardware is in use)
+4. Re-paste updated scripts into `render_footprint` and `rfid_in` Script OPs in TD

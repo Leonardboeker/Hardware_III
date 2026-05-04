@@ -1,19 +1,19 @@
-"""State CHOP — Script CHOP callbacks v1.
+"""compute_state — Script CHOP callbacks.
 
 Aggregates all pipeline state into a single CHOP with named channels
-so the rest of the TD network only needs to reference one operator.
+so the rest of the TD network only references one operator.
 
 Output channels:
   puck_count   int    how many live pucks are currently visible
   area_px2     float  footprint polygon area in projector-space pixels²
                       (0 if fewer than 3 pucks)
   method_id    int    0=none 1=cantilever 2=column_grid 3=arch 4=truss
-                      set by RFID reader via serial1 DAT storage
   hb_alive     int    1 = vision pipeline is running, 0 = offline / timed out
 
-Dependencies (named operators in the same base COMP):
-  cam          OSC In CHOP    — vision pipeline data
-  serial1      Serial DAT     — ESP32/RFID data (optional; method_id=0 if absent)
+Reads from these TD nodes (must exist with these names):
+  vision_in    OSC In CHOP   — puck data from CV pipeline
+  rfid_in      Constant CHOP (stub) or Serial DAT (real ESP32)
+               — must expose method_id either as channel or via .fetch
 """
 import math
 
@@ -28,11 +28,11 @@ def cook(scriptOp):
     scriptOp.appendChan('method_id')
     scriptOp.appendChan('hb_alive')
 
-    cam = op('cam')
+    vision = op('vision_in')
 
     # heartbeat
     try:
-        hb = int(cam['vision/heartbeat:0'][0])
+        hb = int(vision['vision/heartbeat:0'][0])
         hb_alive = 1
     except Exception:
         hb = -1
@@ -42,21 +42,26 @@ def cook(scriptOp):
     pucks = {}
     for pid in FOOTPRINT_IDS:
         try:
-            pf = int(cam[f'puck/{pid}:0'][0])
+            pf = int(vision[f'puck/{pid}:0'][0])
             if hb >= 0 and abs(hb - pf) <= LIVENESS_FRAMES:
                 pucks[pid] = (
-                    float(cam[f'puck/{pid}:1'][0]),
-                    float(cam[f'puck/{pid}:2'][0]),
+                    float(vision[f'puck/{pid}:1'][0]),
+                    float(vision[f'puck/{pid}:2'][0]),
                 )
         except Exception:
             pass
 
-    # method id from serial DAT storage (written by serial_rfid_v1 callbacks)
+    # method id — works with both stub (Constant CHOP channel) and real (Serial DAT storage)
     method_id = 0
-    try:
-        method_id = int(op('rfid').fetch('method_id', 0))
-    except Exception:
-        pass
+    rfid = op('rfid_in')
+    if rfid is not None:
+        try:
+            method_id = int(rfid['method_id'][0])
+        except Exception:
+            try:
+                method_id = int(rfid.fetch('method_id', 0))
+            except Exception:
+                pass
 
     # polygon area via shoelace on sorted points
     area = 0.0

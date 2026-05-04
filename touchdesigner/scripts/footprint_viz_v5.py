@@ -1,24 +1,17 @@
 """Footprint visualizer — Script TOP v5.
 
-CHANGES v5:
-  - Polygon fill (ray-casting, numpy-only) with per-method color
-  - Pucks sorted by angle from centroid → correct convex outline
-  - Status zone shows method color band + heartbeat bar
-  - Reads method_id from Script CHOP named 'state1'
-  - Still 1280×720 (TD Non-Commercial limit)
+Reads from these TD nodes (must exist with these names):
+  vision_in        OSC In CHOP   — puck positions from CV pipeline
+  compute_state    Script CHOP   — method_id channel (optional)
 
 Layout (1280×720):
-  FP  (0,0)→(960,540)    top-left : footprint geometry
+  FP  (0,0)→(960,540)     top-left : footprint geometry
   ST  (960,0)→(1280,540)  top-right: method status panel
   TX  (0,540)→(1280,720)  bottom   : stats text (Text TOP overlay)
 
-OSC — received by node 'cam':
+OSC channels on vision_in:
   puck/N:0 = frame   puck/N:1 = proj_x   puck/N:2 = proj_y
   vision/heartbeat:0 = frame counter
-
-state1 CHOP channels (optional — falls back to OSC-only if absent):
-  method_id   (int 0-4)
-  hb_alive    (1 = pipeline running, 0 = offline)
 """
 import math
 import numpy as np
@@ -56,11 +49,11 @@ METHOD_NAMES = {
 
 
 def cook(scriptOp):
-    cam = op('cam')
+    vision = op('vision_in')
 
     # --- heartbeat ---
     try:
-        hb = int(cam['vision/heartbeat:0'][0])
+        hb = int(vision['vision/heartbeat:0'][0])
     except Exception:
         hb = -1
 
@@ -68,19 +61,19 @@ def cook(scriptOp):
     pucks = {}
     for pid in FOOTPRINT_IDS:
         try:
-            pf = int(cam[f'puck/{pid}:0'][0])
+            pf = int(vision[f'puck/{pid}:0'][0])
             if hb >= 0 and abs(hb - pf) <= LIVENESS_FRAMES:
                 pucks[pid] = (
-                    float(cam[f'puck/{pid}:1'][0]),
-                    float(cam[f'puck/{pid}:2'][0]),
+                    float(vision[f'puck/{pid}:1'][0]),
+                    float(vision[f'puck/{pid}:2'][0]),
                 )
         except Exception:
             pass
 
-    # --- method id from state CHOP (optional) ---
+    # --- method id from compute_state (optional) ---
     method_id = 0
     try:
-        method_id = int(op('state')['method_id'][0])
+        method_id = int(op('compute_state')['method_id'][0])
     except Exception:
         pass
 
