@@ -1,33 +1,22 @@
-"""Footprint visualizer — Script TOP callbacks for TouchDesigner.
+"""Footprint visualizer — Script TOP callbacks for TouchDesigner (numpy only).
 
 Reads per-puck OSC data from oscin1, draws:
   - Circles at each detected puck center
   - Lines connecting pucks in ID order (polygon)
-  - Distance labels on each edge
-  - Area of the polygon (Shoelace formula)
 
-Paste the entire contents into a Script TOP DAT in TD (1280x720 resolution).
-oscin1 must be on port 7000 and receive the /puck/N protocol from osc_send.py.
-
-Channel names from OSC In CHOP:
-  puck/N:0  = frame number when last seen
-  puck/N:1  = projector x
-  puck/N:2  = projector y
-  vision/heartbeat:0 = current frame counter
+Resolution: 1280x720. No external libs required — pure numpy.
+Text labels (distances, area) are handled by a separate Text TOP in TD.
 """
-from PIL import Image, ImageDraw
-import numpy
+import numpy as np
 
 PROJ_W = 1280
 PROJ_H = 720
-FOOTPRINT_IDS = list(range(10))  # ArUco IDs 0-9 are footprint pucks
-LIVENESS_FRAMES = 10             # frames before a puck is considered lost
+FOOTPRINT_IDS = list(range(10))
+LIVENESS_FRAMES = 10
 
-COLOR_LINE    = (255, 255, 255, 200)
-COLOR_PUCK    = (0, 255, 100, 255)
-COLOR_DIST    = (255, 220, 0, 255)
-COLOR_AREA    = (100, 200, 255, 255)
-COLOR_STATUS  = (180, 180, 180, 255)
+COLOR_LINE  = (1.0, 1.0, 1.0, 0.8)
+COLOR_PUCK  = (0.0, 1.0, 0.4, 1.0)
+COLOR_NONE  = (0.3, 0.3, 0.3, 1.0)  # single dot when vision offline
 
 
 def cook(scriptOp):
@@ -49,8 +38,7 @@ def cook(scriptOp):
         except Exception:
             pass
 
-    img = Image.new('RGBA', (PROJ_W, PROJ_H), (0, 0, 0, 255))
-    draw = ImageDraw.Draw(img)
+    img = np.zeros((PROJ_H, PROJ_W, 4), dtype=np.float32)
 
     ids_sorted = sorted(pucks.keys())
     pts = [pucks[i] for i in ids_sorted]
@@ -59,36 +47,37 @@ def cook(scriptOp):
         for i in range(len(pts)):
             p1 = pts[i]
             p2 = pts[(i + 1) % len(pts)]
-            draw.line([(p1[0], p1[1]), (p2[0], p2[1])], fill=COLOR_LINE, width=2)
-
-            dist_px = ((p1[0] - p2[0]) ** 2 + (p1[1] - p2[1]) ** 2) ** 0.5
-            mid = ((p1[0] + p2[0]) / 2, (p1[1] + p2[1]) / 2)
-            draw.text((mid[0] + 5, mid[1] - 16), f"{dist_px:.0f}px", fill=COLOR_DIST)
+            _draw_line(img, p1[0], p1[1], p2[0], p2[1], COLOR_LINE, width=2)
 
     for pid, (px, py) in pucks.items():
-        r = 12
-        draw.ellipse([px - r, py - r, px + r, py + r], outline=COLOR_PUCK, width=3)
-        draw.text((px + 16, py - 10), f"#{pid}", fill=COLOR_PUCK)
+        _draw_circle(img, px, py, 14, COLOR_PUCK, width=3)
 
-    if len(pts) >= 3:
-        area = _shoelace(pts)
-        cx = sum(p[0] for p in pts) / len(pts)
-        cy = sum(p[1] for p in pts) / len(pts)
-        draw.text((cx - 60, cy - 10), f"Area: {area:.0f} px²", fill=COLOR_AREA)
-
-    draw.text((20, 20), f"Pucks: {len(pucks)} / 10", fill=COLOR_STATUS)
-    if hb < 0:
-        draw.text((20, 50), "Vision: OFFLINE", fill=(255, 80, 80, 255))
-
-    img_np = numpy.array(img).astype(numpy.float32) / 255.0
-    scriptOp.copyNumpyArray(img_np)
+    scriptOp.copyNumpyArray(img)
 
 
-def _shoelace(points):
-    n = len(points)
-    area = 0.0
-    for i in range(n):
-        j = (i + 1) % n
-        area += points[i][0] * points[j][1]
-        area -= points[j][0] * points[i][1]
-    return abs(area) / 2.0
+def _draw_line(img, x0, y0, x1, y1, color, width=2):
+    h, w = img.shape[:2]
+    length = max(int(((x1 - x0) ** 2 + (y1 - y0) ** 2) ** 0.5 * 2), 2)
+    t = np.linspace(0, 1, length)
+    xs = (x0 + t * (x1 - x0)).astype(int)
+    ys = (y0 + t * (y1 - y0)).astype(int)
+    half = width // 2
+    for dx in range(-half, half + 1):
+        for dy in range(-half, half + 1):
+            xc = np.clip(xs + dx, 0, w - 1)
+            yc = np.clip(ys + dy, 0, h - 1)
+            img[yc, xc] = color
+
+
+def _draw_circle(img, cx, cy, r, color, width=3):
+    h, w = img.shape[:2]
+    x0 = max(0, int(cx - r - width))
+    x1 = min(w, int(cx + r + width + 1))
+    y0 = max(0, int(cy - r - width))
+    y1 = min(h, int(cy + r + width + 1))
+    if x1 <= x0 or y1 <= y0:
+        return
+    Y, X = np.mgrid[y0:y1, x0:x1]
+    dist = np.sqrt((X - cx) ** 2 + (Y - cy) ** 2)
+    mask = (dist >= r - width / 2) & (dist <= r + width / 2)
+    img[y0:y1, x0:x1][mask] = color
