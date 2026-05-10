@@ -1,5 +1,20 @@
 {
   "_note": "RFID tags for ids 1-4 are PLACEHOLDERS — hardware team (Person 7) must assign real tag IDs from the physical RFID pedestal before demo. All LCA summary fields are sourced ranges from data/methods/*.csv — see source_label for provenance.",
+
+  "_metric_engine_notes": {
+    "revenue_estimate": "NOT applicable — this installation compares embodied carbon, labour, time, and cost. Revenue and profit are not LCA metrics. No dataset exists for this in the project scope. Metric engine must return null for these fields.",
+    "profit_estimate": "NOT applicable — same reason as revenue_estimate. Return null.",
+    "shape_factor_usage": "Multiply all per-m2 values by the shape_factor from shape_factor_table before scaling by area_m2 × floors. Default = 1.0 (rectangle). This corrects for perimeter-to-area ratio — complex plan shapes have more wall area per unit of GFA."
+  },
+
+  "shape_factor_table": {
+    "_note": "Applied by the metric engine as: output = per_m2_value × shape_factor × area_m2 × floors. Based on perimeter-to-area ratio conventions in EN ISO 13789.",
+    "rectangle":  1.00,
+    "l_shape":    1.12,
+    "u_shape":    1.22,
+    "complex":    1.35
+  },
+
   "methods": [
     {
       "id": 0,
@@ -15,6 +30,9 @@
       "cost_per_m2_range": null,
       "source_label": null,
       "geographic_tier": null,
+      "confidence_range": null,
+      "revenue_estimate": null,
+      "profit_estimate": null,
       "data_csv": null
     },
     {
@@ -31,6 +49,9 @@
       "cost_per_m2_range": "950-1350 EUR/m2",
       "source_label": "Hispalyt GlobalEPD 008-016/017/001 + BEDEC ITeC + CYPE FEF010/FFZ010 (Tier 1, Catalonia)",
       "geographic_tier": "Catalan tier-1",
+      "confidence_range": {"level": "high", "score_low": 0.85, "score_high": 0.95, "note": "Dominant Tier-1 Catalan EPDs — data measured in Catalonia, no geographic extrapolation needed."},
+      "revenue_estimate": null,
+      "profit_estimate": null,
       "data_csv": "data/methods/masonry.csv"
     },
     {
@@ -48,6 +69,9 @@
       "cost_per_m2_range": "1000-1500 EUR/m2",
       "source_label": "Mohammad 2020 (Qatar, T1) + Rossi 2024 (whole-house, T1) + Allouzi 2020 (Jordan, T1) — NO Catalan peer-reviewed LCA",
       "geographic_tier": "global (no Catalan data)",
+      "confidence_range": {"level": "medium-low", "score_low": 0.40, "score_high": 0.60, "note": "Tier-1 sources but all from Qatar/Australia/Jordan — geographic extrapolation to Catalonia is required. No peer-reviewed 3DP LCA exists for Spain."},
+      "revenue_estimate": null,
+      "profit_estimate": null,
       "data_csv": "data/methods/3d-printed.csv"
     },
     {
@@ -65,6 +89,9 @@
       "cost_per_m2_range": "1100-1600 EUR/m2",
       "source_label": "Andersen 2022 (CLT, T1) + Wei 2024 (modular concrete HK, T1) + Stora Enso EPD (Austrian CLT, T1) — NO Spanish/Catalan primary LCA",
       "geographic_tier": "EU (no Spanish primary data; CLT = Austrian/Swedish)",
+      "confidence_range": {"level": "medium", "score_low": 0.55, "score_high": 0.72, "note": "Tier-1 EU sources but no Spanish/Catalan primary LCA. Biogenic carbon accounting choice alone swings the CO2 number by 30%. CLT transport Austria→Barcelona adds unmodelled uncertainty."},
+      "revenue_estimate": null,
+      "profit_estimate": null,
       "data_csv": "data/methods/prefab.csv"
     },
     {
@@ -83,6 +110,9 @@
       "cost_per_m2_range": "95-220 EUR/m2 wall",
       "source_label": "RBC EPD 2024 (UK, T1) + Salmio & Huuhka 2026 (Finland, T1) + De Wolf 2020 (T1) + Devenes 2022 (Switzerland, T1) — NO Catalan tier-1 LCA",
       "geographic_tier": "EU proxy (Finnish/Swiss/UK sources; no Catalan data; BEDEC has no reclaimed-brick entry)",
+      "confidence_range": {"level": "medium", "score_low": 0.50, "score_high": 0.68, "note": "Tier-1 EU sources but allocation rule (cut-off vs system-expansion) drives a 5x CO2 swing. No Catalan data. Used as baseline floor, not as a competitor — confidence applies to the range spread, not the method rank."},
+      "revenue_estimate": null,
+      "profit_estimate": null,
       "data_csv": "data/methods/reclaimed-brick.csv",
       "role": "BASELINE — not a 4th competitor. Other methods are plotted against this floor."
     }
