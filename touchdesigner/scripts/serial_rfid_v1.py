@@ -15,17 +15,16 @@ To add tags: scan each physical tag, note the hex ID printed to the TD
 Textport, and add it to RFID_TO_METHOD below.
 """
 
-# Map RFID hex IDs → method index
-# Key = uppercase hex string as sent by ESP32 (no 0x prefix)
+# Map RFID hex IDs → method index.
+# Key = uppercase hex string as sent by the ESP32 (no 0x prefix).
+# Tap each tag once with serial monitor open, copy the printed UID below.
 RFID_TO_METHOD = {
-    'A1B2C3D4': 1,   # Cantilever
-    'E5F6A7B8': 2,   # Column Grid
-    'C9D0E1F2': 3,   # Arch
-    'A3B4C5D6': 4,   # Truss
-    '00000000': 0,   # Reset / None
+    # 'XXXXXXXX': 1,   # Masonry
+    # 'XXXXXXXX': 2,   # 3D Printed
+    # 'XXXXXXXX': 3,   # Prefab
 }
 
-METHOD_NAMES = {0: 'NONE', 1: 'CANTILEVER', 2: 'COLUMN GRID', 3: 'ARCH', 4: 'TRUSS'}
+METHOD_NAMES = {0: 'NONE', 1: 'MASONRY', 2: '3D PRINTED', 3: 'PREFAB'}
 
 
 def onReceive(dat, rowIndex, message, bytes):

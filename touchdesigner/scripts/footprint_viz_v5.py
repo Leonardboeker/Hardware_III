@@ -32,19 +32,17 @@ C_DIVIDER = (0.2, 0.2, 0.2, 1.0)
 C_BG      = (0.05, 0.05, 0.05, 1.0)
 
 METHOD_COLORS = {
-    0: (0.4,  0.4,  0.4),   # none / offline
-    1: (0.0,  0.55, 1.0),   # cantilever — blue
-    2: (1.0,  0.38, 0.0),   # column grid — orange
-    3: (0.75, 0.08, 0.82),  # arch — purple
-    4: (0.95, 0.75, 0.0),   # truss — yellow
+    0: (0.4,  0.4,  0.4),   # none / offline — grey
+    1: (0.85, 0.40, 0.20),  # masonry — terracotta
+    2: (0.10, 0.70, 0.90),  # 3d printed — cyan
+    3: (0.95, 0.75, 0.00),  # prefab — yellow
 }
 
 METHOD_NAMES = {
     0: "NO METHOD",
-    1: "CANTILEVER",
-    2: "COLUMN GRID",
-    3: "ARCH",
-    4: "TRUSS",
+    1: "MASONRY",
+    2: "3D PRINTED",
+    3: "PREFAB",
 }
 
 
