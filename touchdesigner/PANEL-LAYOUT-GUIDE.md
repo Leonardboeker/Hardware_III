@@ -1,96 +1,122 @@
 # Panel Layout Guide (1280×720)
 
-UI layout from `reference/Panel_Ui.pdf`, scaled from 1920×1080 → 1280×720
-(scale factor 2/3) for the TD Non-Commercial resolution limit.
+UI from `reference/Panel_Ui.pdf`, scaled from 1920×1080 → 1280×720
+(TD Non-Commercial limit). One Script TOP does **everything** — panels,
+footprint geometry, method color, AND auto-places text from named Text TOPs.
 
-## Panel coordinates
-
-| Panel ID | x, y, w, h | What goes in it |
-|----------|------------|-----------------|
-| `panel_top_phase_navigation` | 271, 15, 600, 67 | Phase selector (foundation → finishing) |
-| `panel_left_info` | 17, 15, 213, 467 | Current phase info, impact, material, logistics |
-| `panel_left_assembly_sequence` | 17, 493, 307, 173 | Assembly sequence preview + thumbnails |
-| `panel_main_plan_simulation` | 245, 108, 652, 373 | **Footprint geometry — auto-rendered** |
-| `panel_method_selection` | 337, 493, 560, 173 | **Method color block — auto-rendered** |
-| `panel_right_comparison` | 910, 15, 353, 292 | Phase-based comparison table |
-| `panel_right_cost_chart` | 910, 321, 353, 160 | Cost breakdown chart |
-| `panel_right_phase_preview` | 910, 493, 353, 173 | Phase preview + checklist |
-| `bar_bottom_status` | 0, 687, 1280, 33 | Reset, help, audio, heartbeat dot |
-
-## Build phases
-
-### Phase 1 — Frame (DONE)
-
-`render_footprint` Script TOP now draws:
-- Background + edge frames for all 9 panels
-- Footprint geometry inside `panel_main_plan_simulation`
-- Method color block inside `panel_method_selection`
-- Heartbeat dot inside `bar_bottom_status`
-
-No code change needed in TD — just re-paste [`scripts/footprint_viz_v5.py`](scripts/footprint_viz_v5.py)
-into the existing `render_footprint` Script TOP.
-
-### Phase 2 — Text overlays (NEXT)
-
-Add one Text TOP per text-bearing panel, then composite over `render_footprint`.
-
-Naming convention: `text_<panel_id>` — e.g. `text_method_selection`, `text_left_info`.
-
-| Text TOP | Position (x, y, w, h) | Content (expression mode) |
-|---|---|---|
-| `text_top_phase` | 271, 15, 600, 67 | active phase name (e.g. "STRUCTURE") |
-| `text_left_info` | 17, 15, 213, 467 | phase info text block |
-| `text_method_selection` | 337+170, 493, 390, 173 | method name (right of color block) |
-| `text_right_comparison` | 910, 15, 353, 292 | comparison table rows |
-| `text_right_cost` | 910, 321, 353, 160 | total cost + breakdown |
-| `text_right_phase_preview` | 910, 493, 353, 173 | checklist |
-| `text_bottom_status` | 30, 687, 1250, 33 | help text + heartbeat label |
-
-For each Text TOP:
-- Resolution = panel size from the table above
-- Font Size: see suggested sizes below
-- Color = white (1,1,1,1) or grey (0.85, 0.85, 0.85, 1.0)
-- Align: per panel design
-
-Suggested font sizes for 1280×720:
-- Panel labels / headings: 18 pt
-- Body text: 13 pt
-- Big numbers (method name, totals): 28 pt
-
-### Phase 3 — Compose
-
-Replace the current `compose_final` Over TOP with a **Layout TOP** chain
-or a series of stacked Over TOPs that place each Text TOP at its
-target panel position. Order:
+## Network topology — much simpler now
 
 ```
-render_footprint  (bottom layer — panel frames + footprint + method color)
-  + text_top_phase
-  + text_left_info
-  + text_method_selection
-  + text_right_comparison
-  + text_right_cost
-  + text_right_phase_preview
-  + text_bottom_status
-  = compose_final → projector_out
+vision_in ─┐
+rfid_in   ─┼─► compute_state ─┐
+                              │
+                              ▼
+                       render_footprint  ─►  projector_out
+                       (Script TOP, also reads
+                        all text_<panel_id> TOPs)
+                              ▲
+                              │
+              text_method_selection (Text TOP)
+              text_top_phase_navigation (Text TOP)
+              text_right_comparison (Text TOP)
+              ... (one per panel you want text in)
 ```
 
-Each Over TOP needs Translate ty/tx set to position the text panel correctly.
+**No more `compose_final`. No more Over TOP. No more Translate math.**
 
-> Tip: instead of N stacked Over TOPs, use one **Composite TOP** with N inputs —
-> set each input's "Translate" in the Composite parameters. Cleaner network.
+## Panel coordinates (1280×720)
 
-## Quick test of Phase 1
+| Panel ID | x, y, w, h | Text TOP name | Suggested font size |
+|----------|------------|---------------|---------------------|
+| `top_phase_navigation` | 271, 15, 600, 67 | `text_top_phase_navigation` | 28 |
+| `left_info` | 17, 15, 213, 467 | `text_left_info` | 13 |
+| `left_assembly_sequence` | 17, 493, 307, 173 | `text_left_assembly_sequence` | 13 |
+| `main_plan_simulation` | 245, 108, 652, 373 | — (footprint auto-rendered) | — |
+| `method_selection` | 337, 493, 560, 173 | `text_method_selection` | 42 |
+| `right_comparison` | 910, 15, 353, 292 | `text_right_comparison` | 14 |
+| `right_cost_chart` | 910, 321, 353, 160 | `text_right_cost_chart` | 16 |
+| `right_phase_preview` | 910, 493, 353, 173 | `text_right_phase_preview` | 14 |
+| `bar_bottom_status` | 0, 687, 1280, 33 | `text_bar_bottom_status` | 14 |
 
-After re-pasting `footprint_viz_v5.py`:
+## How to add text to any panel
 
-1. Inline-preview of `render_footprint` should show **9 dark rectangles** with borders
-2. Change `rfid_in` Channel 0 Value → the block inside `panel_method_selection`
-   changes color (terracotta / cyan / yellow / grey)
-3. Run vision pipeline → puck circles appear inside `panel_main_plan_simulation`,
-   not stretched over the whole canvas
-4. The heartbeat dot in the bottom-left of the status bar is green when
-   vision is running, red when offline
+This is the **only workflow** you need. Repeat per panel.
 
-If something looks wrong: take a screenshot of the `render_footprint` preview
-and we adjust.
+1. **Add → TOP → Text**
+2. **Rename** to `text_<panel_id>` exactly (e.g. `text_method_selection`)
+3. **Common Tab** → **Resolution** = panel's `w` × `h` from the table above
+4. **Text Tab** → click `=` next to **Text** for expression mode, or type a literal string
+5. **Font Tab** → set Size from the table, **Horizontal Align**: Center, **Vertical Align**: Center
+6. **Color Tab** → text color (white = `1, 1, 1, 1`)
+7. **DON'T wire it to anything** — the Script TOP picks it up automatically by name
+
+That's it. The Script TOP reads the Text TOP's pixels every frame and composites them into the right panel position.
+
+## Ready-to-paste Text expressions
+
+For text panels with data binding (Expression mode):
+
+**`text_method_selection`** — current construction method name:
+```python
+['NO METHOD', 'MASONRY', '3D PRINTED', 'PREFAB'][max(0, min(int(op('compute_state')['method_id'][0]), 3))]
+```
+
+**`text_bar_bottom_status`** — live status line:
+```python
+'VISION ' + ['OFFLINE','LIVE'][int(op('compute_state')['hb_alive'][0])] + '   |   Pucks: ' + str(int(op('compute_state')['puck_count'][0])) + '   |   Area: ' + str(int(op('compute_state')['area_px2'][0])) + ' px²'
+```
+
+**`text_top_phase_navigation`** — static phase name for now:
+```python
+'FOUNDATION'
+```
+
+**`text_left_info`** — placeholder per phase (multi-line):
+```python
+'PHASE INFO\\n\\nImpact: TBD\\nMaterial: TBD\\nLogistics: TBD'
+```
+
+**`text_right_comparison`** — placeholder for comparison table:
+```python
+'COMPARISON\\n\\nMasonry: ...\\n3D Printed: ...\\nPrefab: ...'
+```
+
+**`text_right_cost_chart`** — total cost placeholder:
+```python
+'TOTAL COST\\n\\n€ —— / m²'
+```
+
+**`text_right_phase_preview`** — checklist placeholder:
+```python
+'PHASE CHECKLIST\\n\\n☐ Place pucks\\n☐ Validate\\n☐ Continue'
+```
+
+## Cleanup: delete the old composite chain
+
+The old approach used `compose_final` (Over TOP) + a single `text_method_selection`
+positioned with manual Translate. Both can go:
+
+1. Click on `compose_final` → **Delete**
+2. (Don't delete `text_method_selection` — we want to keep that Text TOP, just
+   rename if needed and let the Script TOP pick it up automatically)
+3. Wire **`render_footprint` Out → `projector_out` In** directly
+
+## Verifying it works
+
+Inline-preview `render_footprint` (key `1` over the node). You should see:
+- All 9 panels with borders
+- Whatever text is in `text_method_selection` showing inside the method selection
+  panel — automatically, no translates set anywhere
+- Heartbeat dot bottom-left
+- Method color block on left side of method panel
+
+Change `rfid_in` value → method block color + method name update live.
+
+## Why this is better than Over TOPs
+
+- **One source of truth** — panel positions live in the Python script
+- **Pixel-precise** — no normalized `-0.5..+0.5` math
+- **Scales** — add a 10th panel? Add one entry to `PANELS` dict, done
+- **Less network clutter** — no compose chain
+- **Auto-discovery** — if you don't create `text_left_info`, that panel just
+  shows empty frame, no errors
