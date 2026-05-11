@@ -71,7 +71,7 @@ METHOD_COLORS = {
 }
 
 METHOD_NAMES = {
-    0: "NO METHOD",
+    0: "NONE",
     1: "MASONRY",
     2: "3D PRINTED",
     3: "PREFAB",
@@ -115,6 +115,11 @@ def cook(scriptOp):
         pass
     mc = METHOD_COLORS.get(method_id, METHOD_COLORS[0])
 
+    try:
+        hb_alive = int(op('compute_state')['hb_alive'][0])
+    except Exception:
+        hb_alive = 1 if hb >= 0 else 0
+
     # ----- render -----
     img = np.zeros((PROJ_H, PROJ_W, 4), dtype=np.float32)
     img[:, :] = C_BG
@@ -130,6 +135,10 @@ def cook(scriptOp):
 
     # AUTO-BLIT text overlays from named Text TOPs
     _blit_text_overlays(img)
+
+    # DISCONNECTED overlay — shown when vision pipeline has been offline > 3 s
+    if hb_alive == 0:
+        _draw_disconnected(img)
 
     scriptOp.copyNumpyArray(img)
 
@@ -148,7 +157,7 @@ def _blit_text_overlays(img):
         if text_op is None:
             continue
         try:
-            tex = text_op.numpyArray(delayed=False)
+            tex = text_op.numpyArray(delayed=True)
         except Exception:
             continue
         if tex is None:
@@ -160,10 +169,10 @@ def _blit_text_overlays(img):
             alpha = np.ones((*tex.shape[:2], 1), dtype=tex.dtype)
             tex = np.concatenate([tex, alpha], axis=-1)
         # match dtype
-        if tex.dtype != np.float32:
+        if tex.dtype == np.uint8:
+            tex = tex.astype(np.float32) / 255.0
+        elif tex.dtype != np.float32:
             tex = tex.astype(np.float32)
-            if tex.max() > 1.5:
-                tex = tex / 255.0
         bx, by, bw, bh = bounds
         _blit_alpha(img, tex, bx, by, bw, bh)
 
@@ -231,6 +240,21 @@ def _draw_heartbeat_dot(img, hb):
     cx = bx + 16
     color = (0.0, 0.9, 0.3, 1.0) if hb >= 0 else (0.85, 0.15, 0.15, 1.0)
     _circle(img, cx, cy, 6, color, width=10)
+
+
+def _draw_disconnected(img):
+    """Full-canvas overlay when vision pipeline is offline."""
+    bx, by, bw, bh = PANELS['main_plan_simulation']
+    # dim the main panel
+    img[by:by+bh, bx:bx+bw, :3] *= 0.3
+    # draw centred warning text as a simple rectangle marker
+    cx = bx + bw // 2
+    cy = by + bh // 2
+    # red X lines
+    size = 30
+    _line(img, cx - size, cy - size, cx + size, cy + size, (0.85, 0.15, 0.15, 1.0), 4)
+    _line(img, cx + size, cy - size, cx - size, cy + size, (0.85, 0.15, 0.15, 1.0), 4)
+    # pulsing dot already handled by _draw_heartbeat_dot (turns red)
 
 
 # ---------------------------------------------------------------------------

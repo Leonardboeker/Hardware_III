@@ -58,12 +58,12 @@ For text panels with data binding (Expression mode):
 
 **`text_method_selection`** — current construction method name:
 ```python
-['NO METHOD', 'MASONRY', '3D PRINTED', 'PREFAB'][max(0, min(int(op('compute_state')['method_id'][0]), 3))]
+['NO METHOD', 'MASONRY', '3D PRINTED', 'PREFAB', 'RECLAIMED BRICK'][max(0, min(int(op('compute_state')['method_id'][0]), 4))]
 ```
 
 **`text_bar_bottom_status`** — live status line:
 ```python
-'VISION ' + ['OFFLINE','LIVE'][int(op('compute_state')['hb_alive'][0])] + '   |   Pucks: ' + str(int(op('compute_state')['puck_count'][0])) + '   |   Area: ' + str(int(op('compute_state')['area_px2'][0])) + ' px²'
+'VISION ' + ['OFFLINE','LIVE'][int(op('compute_state')['hb_alive'][0])] + '   |   Points: ' + str(int(op('compute_state')['puck_count'][0])) + '   |   Area: ' + str(round(op('compute_state')['area_m2'][0], 2)) + ' m²'
 ```
 
 **`text_top_phase_navigation`** — static phase name for now:
@@ -78,7 +78,7 @@ For text panels with data binding (Expression mode):
 
 **`text_right_comparison`** — placeholder for comparison table:
 ```python
-'COMPARISON\\n\\nMasonry: ...\\n3D Printed: ...\\nPrefab: ...'
+'COMPARISON\\n\\nMasonry: ...\\n3D Printed: ...\\nPrefab: ...\\nReclaimed Brick: ...'
 ```
 
 **`text_right_cost_chart`** — total cost placeholder:

@@ -7,6 +7,7 @@ Output channels:
   puck_count   int    how many live pucks are currently visible
   area_px2     float  footprint polygon area in projector-space pixels²
                       (0 if fewer than 3 pucks)
+  area_m2      float  footprint area converted to real-world m²
   method_id    int    0=none 1=masonry 2=3d_printed 3=prefab 4=reclaimed_brick
   hb_alive     int    1 = vision pipeline is running, 0 = offline / timed out
 
@@ -16,12 +17,25 @@ Reads from these TD nodes (must exist with these names):
   rfid_in      Constant CHOP (stub) or Serial DAT (real ESP32)
                — must expose method_id either as channel or via .fetch
 
-Method priority: rfid_in (non-zero) > vision /method/id > 0 (none)
+Method priority: rfid_in (non-negative) > vision /method/id > 0 (none)
+-1 = no signal from RFID; 0 = explicit NONE/reset tag scanned
 """
 import math
 
+# Physical table dimensions in metres — update after measuring the actual table.
+# Used to convert area_px2 (projector pixels²) → area_m2.
+# Default assumes the 900×600 working plane maps to a 0.9 m × 0.6 m table.
+_TABLE_W_M = 0.9
+_TABLE_H_M = 0.6
+_PROJ_W    = 1280
+_PROJ_H    = 720
+_PX2_TO_M2 = (_TABLE_W_M / _PROJ_W) * (_TABLE_H_M / _PROJ_H)
+
 FOOTPRINT_IDS   = list(range(10))
 LIVENESS_FRAMES = 10
+
+_last_hb_value  = -1
+_last_hb_frame  = -1
 
 
 def cook(scriptOp):
@@ -30,13 +44,20 @@ def cook(scriptOp):
     scriptOp.appendChan('area_px2')
     scriptOp.appendChan('method_id')
     scriptOp.appendChan('hb_alive')
+    scriptOp.appendChan('area_m2')
 
     vision = op('vision_in')
 
-    # heartbeat
+    # heartbeat — hb_alive only goes 1 if the counter is actually advancing
+    global _last_hb_value, _last_hb_frame
     try:
         hb = int(vision['vision/heartbeat:0'][0])
-        hb_alive = 1
+        td_frame = me.time.frame
+        if hb != _last_hb_value:
+            _last_hb_value = hb
+            _last_hb_frame = td_frame
+        # alive if heartbeat changed within the last 90 TD frames (~3 s at 30 fps)
+        hb_alive = 1 if (td_frame - _last_hb_frame) < 90 else 0
     except Exception:
         hb = -1
         hb_alive = 0
@@ -54,25 +75,30 @@ def cook(scriptOp):
         except Exception:
             pass
 
-    # method id — priority: RFID pedestal > vision ArUco token > 0 (none)
-    method_id = 0
+    # method id — priority: RFID pedestal (non-negative) > vision ArUco token > 0 (none)
+    # -1 = no signal from RFID; 0 = explicit NONE/reset tag scanned
+    method_id = -1
     rfid = op('rfid_in')
     if rfid is not None:
         try:
             method_id = int(rfid['method_id'][0])
         except Exception:
             try:
-                method_id = int(rfid.fetch('method_id', 0))
+                method_id = int(rfid.fetch('method_id', -1))
             except Exception:
                 pass
+        if method_id < 0:
+            print('[state_chop] rfid_in not returning method_id — check node type/name')
 
-    # vision fallback: vision/main.py sends /method/id on the same OSC port
-    # so vision_in already has it — no extra TD node needed
-    if method_id == 0 and vision is not None:
+    # vision fallback: vision/main.py sends /method/id when ArUco method token detected
+    if method_id < 0 and vision is not None:
         try:
             method_id = int(vision['method/id:0'][0])
         except Exception:
-            pass
+            method_id = 0   # true default: no method
+
+    if method_id < 0:
+        method_id = 0
 
     # polygon area via shoelace on sorted points
     area = 0.0
@@ -85,6 +111,7 @@ def cook(scriptOp):
 
     scriptOp['puck_count'][0] = len(pucks)
     scriptOp['area_px2'][0]   = area
+    scriptOp['area_m2'][0]    = area * _PX2_TO_M2
     scriptOp['method_id'][0]  = method_id
     scriptOp['hb_alive'][0]   = hb_alive
 

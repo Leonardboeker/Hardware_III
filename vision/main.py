@@ -77,10 +77,12 @@ def _find_external_camera():
         cap = cv2.VideoCapture(idx, cv2.CAP_DSHOW)
         if cap.isOpened():
             ret, _ = cap.read()
-            cap.release()
+            cap.release()   # always release before deciding
             if ret:
                 print(f"[CAM] Using external camera at index {idx}")
                 return idx
+        else:
+            cap.release()   # release even if isOpened() returned False
     print("[CAM] WARNING: no external camera found — falling back to built-in webcam (index 0)")
     return 0
 
@@ -96,6 +98,7 @@ def main():
 
     cap.set(cv2.CAP_PROP_FRAME_WIDTH,  1280)
     cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
+    cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)   # minimise buffer to reduce gesture lag
 
     # Camera calibration (needed for accurate 3-D projection)
     K, dist = load_calibration()
@@ -257,9 +260,16 @@ def _send_to_td(points, build_markers):
     proj_w, proj_h = 1280, 720
 
     for i, (px, py) in enumerate(points):
-        proj_x = (px / PLANE_W) * proj_w
-        proj_y = (py / PLANE_H) * proj_h
-        _TD_CLIENT.send_message(f"/puck/{i}", [_osc_frame, float(proj_x), float(proj_y)])
+        proj_x = float(np.clip((px / PLANE_W) * proj_w, 0, proj_w))
+        proj_y = float(np.clip((py / PLANE_H) * proj_h, 0, proj_h))
+        _TD_CLIENT.send_message(f"/puck/{i}", [_osc_frame, proj_x, proj_y])
+
+    if not points:
+        # Explicit clear: age out all 10 puck channels so TD stops drawing them.
+        # Sending a frame value guaranteed to fail the liveness check (hb - LIVENESS_FRAMES - 1).
+        stale_frame = max(0, _osc_frame - 11)
+        for i in range(10):
+            _TD_CLIENT.send_message(f"/puck/{i}", [stale_frame, 0.0, 0.0])
 
     _TD_CLIENT.send_message("/vision/heartbeat", [_osc_frame])
 
@@ -271,7 +281,7 @@ def _send_to_td(points, build_markers):
             break
     _TD_CLIENT.send_message("/method/id", [method_id])
 
-    _osc_frame += 1
+    _osc_frame = (_osc_frame + 1) % 100000
 
 
 if __name__ == '__main__':

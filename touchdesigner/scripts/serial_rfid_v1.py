@@ -39,7 +39,8 @@ def onReceive(dat, rowIndex, message, bytes):
         tag = line[5:].upper()
         method_id = RFID_TO_METHOD.get(tag, None)
         if method_id is None:
-            print(f'[serial_rfid] UNKNOWN TAG: {tag}  — add it to RFID_TO_METHOD')
+            print(f'[serial_rfid] UNKNOWN TAG: {tag}  — resetting to NONE. Add to RFID_TO_METHOD if needed.')
+            dat.store('method_id', 0)
             return
         dat.store('method_id', method_id)
         print(f'[serial_rfid] tag={tag}  method_id={method_id} ({METHOD_NAMES[method_id]})')
