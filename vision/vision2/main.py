@@ -60,7 +60,12 @@ BUILD_LABELS = {
 
 
 def _open_camera(idx: int):
-    """Open the MX Brio via DSHOW, set resolution before first read, warm up."""
+    """Open the MX Brio via DSHOW, set resolution, lock focus + exposure.
+
+    MX Brio's autofocus + auto-exposure constantly retune, which kills HSV
+    red-puck tracking (the dwell timer resets every time the puck briefly
+    disappears). Hard-lock both off after warmup.
+    """
     for w, h in ((1920, 1080), (1280, 720)):
         cap = cv2.VideoCapture(idx, cv2.CAP_DSHOW)
         if not cap.isOpened():
@@ -68,14 +73,27 @@ def _open_camera(idx: int):
         cap.set(cv2.CAP_PROP_FRAME_WIDTH,  w)
         cap.set(cv2.CAP_PROP_FRAME_HEIGHT, h)
         cap.set(cv2.CAP_PROP_FPS, 30)
-        cap.set(cv2.CAP_PROP_AUTOFOCUS, 1)
+
+        # Disable auto-focus + lock to medium distance (good for overhead tabletop)
+        cap.set(cv2.CAP_PROP_AUTOFOCUS, 0)
+        cap.set(cv2.CAP_PROP_FOCUS, 30)   # 0=infinity, 255=closest; 30 ≈ 30-50cm
+
+        # Disable auto-exposure (DSHOW: 0.25 = manual, 0.75 = auto)
+        cap.set(cv2.CAP_PROP_AUTO_EXPOSURE, 0.25)
+        cap.set(cv2.CAP_PROP_EXPOSURE, -6)  # -7..-4 typical for indoor
+
+        # Auto white-balance off — stabilises red hue
+        cap.set(cv2.CAP_PROP_AUTO_WB, 0)
+        cap.set(cv2.CAP_PROP_WB_TEMPERATURE, 4500)
+
         for _ in range(10):
             cap.read()
         ret, frame = cap.read()
         if ret and frame is not None and frame.size > 0:
             actual_w = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
             actual_h = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-            print(f"[CAM] index {idx} | DSHOW | {actual_w}x{actual_h} @ 30 fps")
+            print(f"[CAM] index {idx} | DSHOW | {actual_w}x{actual_h} @ 30 fps "
+                  f"| AF/AE/AWB locked")
             return cap
         cap.release()
     return None
