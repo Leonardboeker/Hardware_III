@@ -52,26 +52,6 @@ BUILD_LABELS = {
     22: "Prefab",
 }
 
-# ---------------------------------------------------------------------------
-# OSC → TouchDesigner bridge (optional — requires python-osc)
-# Sends sketch footprint points as /puck/N and /vision/heartbeat so the TD
-# network reacts to gesture input without any code changes on the TD side.
-# TD OSC In CHOP must listen on 127.0.0.1:7000 (default).
-# ---------------------------------------------------------------------------
-try:
-    from pythonosc import udp_client as _osc_udp
-    _TD_CLIENT = _osc_udp.SimpleUDPClient("127.0.0.1", 7000)
-    _OSC_ENABLED = True
-    print("[OSC] TouchDesigner bridge active on 127.0.0.1:7000")
-except ImportError:
-    _TD_CLIENT = None
-    _OSC_ENABLED = False
-    print("[OSC] python-osc not installed — TD bridge disabled. pip install python-osc")
-
-# ArUco method marker → method_id (matches data/methods_db.json)
-_MARKER_TO_METHOD = {20: 1, 21: 2, 22: 3}
-_osc_frame = 0
-
 
 def _find_external_camera():
     for idx in range(1, 5):
@@ -184,10 +164,6 @@ def main():
                 is_extruded = False
                 print("[X] Reset")
 
-        # ── 5b. OSC → TouchDesigner ──────────────────────────────────────
-        if _OSC_ENABLED:
-            _send_to_td(sketch.points, build_markers)
-
         # ── 6. Draw ──────────────────────────────────────────────────────
         draw_working_plane(frame, H_inv)
         _draw_build_markers(frame, build_markers)
@@ -256,43 +232,6 @@ def _draw_build_markers(frame, build_markers):
         cv2.putText(frame, label, (cx + 12, cy + 5),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.5, (200, 80, 255), 2)
 
-
-def _send_to_td(points, build_markers):
-    """Send current sketch state to TouchDesigner via OSC (legacy schema).
-
-    Sketch points → /puck/N [frame, proj_x, proj_y]
-    Heartbeat     → /vision/heartbeat [frame]
-    Method token  → /method/id [method_id]  (TD needs a separate OSC In CHOP for this)
-
-    Coords are remapped from working-plane pixels (PLANE_W×PLANE_H) to
-    projector pixels (1280×720) so the TD footprint panel renders correctly.
-    """
-    global _osc_frame
-    proj_w, proj_h = 1280, 720
-
-    for i, (px, py) in enumerate(points):
-        proj_x = float(np.clip((px / PLANE_W) * proj_w, 0, proj_w))
-        proj_y = float(np.clip((py / PLANE_H) * proj_h, 0, proj_h))
-        _TD_CLIENT.send_message(f"/puck/{i}", [_osc_frame, proj_x, proj_y])
-
-    if not points:
-        # Explicit clear: age out all 10 puck channels so TD stops drawing them.
-        # Sending a frame value guaranteed to fail the liveness check (hb - LIVENESS_FRAMES - 1).
-        stale_frame = max(0, _osc_frame - 11)
-        for i in range(10):
-            _TD_CLIENT.send_message(f"/puck/{i}", [stale_frame, 0.0, 0.0])
-
-    _TD_CLIENT.send_message("/vision/heartbeat", [_osc_frame])
-
-    method_id = 0
-    for mid in build_markers:
-        mapped = _MARKER_TO_METHOD.get(mid)
-        if mapped is not None:
-            method_id = mapped
-            break
-    _TD_CLIENT.send_message("/method/id", [method_id])
-
-    _osc_frame = (_osc_frame + 1) % 100000
 
 
 if __name__ == '__main__':
