@@ -88,22 +88,51 @@ LIVENESS_FRAMES = 10
 def cook(scriptOp):
     vision = op('vision_in')
 
+    # TD names multi-arg OSC channels in 3 different conventions depending on
+    # version / OSC In CHOP settings. Helper tries all three.
+    def _ch(name):
+        if vision is None:
+            return None
+        for variant in (name, f'{name}:0'):
+            try:
+                return vision[variant][0]
+            except Exception:
+                pass
+        return None
+
+    def _puck_arg(pid, arg_idx):
+        for n in (f'puck/{pid}:{arg_idx}', f'puck/{pid}{arg_idx}', f'puck/{pid}{arg_idx + 1}'):
+            try:
+                return vision[n][0]
+            except Exception:
+                pass
+        return None
+
     # heartbeat
+    hb_raw = _ch('vision/heartbeat')
     try:
-        hb = int(vision['vision/heartbeat:0'][0])
+        hb = int(hb_raw) if hb_raw is not None else -1
     except Exception:
         hb = -1
 
     # puck positions
     pucks = {}
     for pid in FOOTPRINT_IDS:
+        pf = _puck_arg(pid, 0)
+        if pf is None:
+            continue
         try:
-            pf = int(vision[f'puck/{pid}:0'][0])
-            if hb >= 0 and abs(hb - pf) <= LIVENESS_FRAMES:
-                pucks[pid] = (
-                    float(vision[f'puck/{pid}:1'][0]),
-                    float(vision[f'puck/{pid}:2'][0]),
-                )
+            pf = int(pf)
+        except Exception:
+            continue
+        if hb < 0 or abs(hb - pf) > LIVENESS_FRAMES:
+            continue
+        px = _puck_arg(pid, 1)
+        py = _puck_arg(pid, 2)
+        if px is None or py is None:
+            continue
+        try:
+            pucks[pid] = (float(px), float(py))
         except Exception:
             pass
 
