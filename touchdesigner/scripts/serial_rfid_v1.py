@@ -89,11 +89,21 @@ def _extract_names(db):
 # ---------------------------------------------------------------------------
 # Serial DAT callbacks
 # ---------------------------------------------------------------------------
+_HEX = set('0123456789ABCDEF')
+
+
 def onReceive(dat, rowIndex, message, bytes):
     line = message.strip()
 
-    if line.startswith('RFID:'):
-        tag = line[5:].upper()
+    # Tolerant RFID match — handle leading transmission noise like "!RFID:..."
+    if 'RFID:' in line:
+        idx = line.index('RFID:') + 5
+        raw = line[idx:].strip().upper()
+        tag = ''.join(c for c in raw if c in _HEX)  # strip any non-hex artifacts
+        if not tag:
+            print(f'[serial_rfid] dropped malformed RFID line: {line!r}')
+            return
+
         mapping, names = _load_mapping()
         method_id = mapping.get(tag, None)
         if method_id is None:
@@ -105,12 +115,12 @@ def onReceive(dat, rowIndex, message, bytes):
         name = names.get(method_id, '?')
         print(f'[serial_rfid] tag={tag}  method_id={method_id} ({name})')
 
-    elif line.startswith('HB:'):
-        # heartbeat from ESP32 — confirms reader is alive
+    elif 'HB:' in line:
+        # heartbeat from ESP32 — confirms reader is alive (silent in textport)
         pass
 
     elif line:
-        print(f'[serial_rfid] raw: {line}')
+        print(f'[serial_rfid] raw: {line!r}')
 
 
 def onConnect(dat):
