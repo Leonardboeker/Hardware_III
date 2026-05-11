@@ -76,6 +76,7 @@ def main():
 
     cap.set(cv2.CAP_PROP_FRAME_WIDTH,  1280)
     cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
+    cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)   # minimise lag for puck placement accuracy
 
     # Camera calibration (needed for accurate 3-D projection)
     K, dist = load_calibration()

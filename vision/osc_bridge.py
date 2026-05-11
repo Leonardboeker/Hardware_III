@@ -108,6 +108,7 @@ _GESTURE_ID: dict[str, int] = {
     "peace":         2,
     "three_fingers": 3,
     "fist":          4,
+    "puck":          1,   # RedPuckDetector — maps to same slot as index_only
 }
 
 _ACTION_ID: dict[str, int] = {
