@@ -78,15 +78,14 @@ def cook(scriptOp):
     # A stale value (pipeline frozen or disconnected) times out after
     # HB_TIMEOUT_TICKS TD frames (~3 s at 30 fps).
     global _last_hb_value, _last_hb_frame
-    try:
-        hb = int(vision['vision/heartbeat:0'][0])
+    hb = _chan(vision, 'vision/heartbeat', default=-1)
+    if hb >= 0:
         td_frame = me.time.frame
         if hb != _last_hb_value:
             _last_hb_value = hb
             _last_hb_frame = td_frame
         hb_alive = 1 if (td_frame - _last_hb_frame) < HB_TIMEOUT_TICKS else 0
-    except Exception:
-        hb = -1
+    else:
         hb_alive = 0
 
     # ── Puck positions (sketch footprint points) ──────────────────────────────
@@ -170,15 +169,33 @@ def _shoelace(pts: list) -> float:
     return abs(a) / 2.0
 
 
+def _chan(op_node, channel: str, default=0):
+    """Read an OSC channel value, tolerant of TD's :0 suffix convention.
+
+    Tries both `name` (single-arg messages) and `name:0` (multi-arg),
+    so the script works regardless of how the OSC In CHOP groups args.
+    """
+    if op_node is None:
+        return default
+    for variant in (channel, f'{channel}:0'):
+        try:
+            return op_node[variant][0]
+        except Exception:
+            pass
+    return default
+
+
 def _int_chan(op_node, channel: str, default: int = 0) -> int:
+    val = _chan(op_node, channel, default)
     try:
-        return int(op_node[channel][0])
+        return int(val)
     except Exception:
         return default
 
 
 def _float_chan(op_node, channel: str, default: float = 0.0) -> float:
+    val = _chan(op_node, channel, default)
     try:
-        return float(op_node[channel][0])
+        return float(val)
     except Exception:
         return default
