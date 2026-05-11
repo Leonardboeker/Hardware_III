@@ -112,27 +112,19 @@ def cook(scriptOp):
         area = _shoelace(pts_sorted)
 
     # ── Method ID ─────────────────────────────────────────────────────────────
-    # Priority: VisionBridge /method/selected > rfid_in > 0 (NONE)
-    # -1 = no signal; 0 = explicit NONE/reset; 1-4 = method selected
-    method_id = -1
-    try:
-        method_id = int(vision['method/selected:0'][0])
-    except Exception:
-        pass
-
-    if method_id < 0:
-        # Fallback to rfid_in (Constant CHOP stub or Serial DAT)
-        rfid = op('rfid_in')
-        if rfid is not None:
+    # Team decision (2026-05-11): RFID is the SINGLE source of method selection.
+    # vision2's /method/selected (from ArUco token markers 20/21/22) is
+    # intentionally ignored — physical interaction stays RFID-only.
+    method_id = 0
+    rfid = op('rfid_in')
+    if rfid is not None:
+        try:
+            method_id = int(rfid['method_id'][0])
+        except Exception:
             try:
-                method_id = int(rfid['method_id'][0])
+                method_id = int(rfid.fetch('method_id', 0))
             except Exception:
-                try:
-                    method_id = int(rfid.fetch('method_id', -1))
-                except Exception:
-                    pass
-        if method_id < 0:
-            method_id = 0   # true default: no method
+                pass
 
     # ── Sketch state ──────────────────────────────────────────────────────────
     sketch_points  = _int_chan(vision, 'sketch/points:0')
