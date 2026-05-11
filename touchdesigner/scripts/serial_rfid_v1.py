@@ -1,52 +1,112 @@
 """rfid_in — Serial DAT callbacks (real hardware path).
 
-Use this ONLY when the ESP32 + RFID reader is physically connected.
-For now (no hardware), use a Constant CHOP named 'rfid_in' instead.
+Reads tag→method mapping directly from data/methods_db.json so that the
+hardware team can update tag IDs by editing the JSON (no Python edits).
 
-ESP32 firmware sends one line per tag scan over USB serial (115200 baud):
-    RFID:<8-char-hex-id>
-Example:
-    RFID:A1B2C3D4
+Wiring:
+  ESP32 firmware sends one line per tag scan over USB serial (115200 baud):
+      RFID:<8-char-hex-id>
+      Example: RFID:A1B2C3D4
 
-The callback maps the tag to a method_id and stores it on the DAT so that
-compute_state can read it via op('rfid_in').fetch('method_id', 0).
+  This callback parses the line, looks up the tag in methods_db.json,
+  and stores the matching method_id on this DAT.
+  compute_state reads it via op('rfid_in').fetch('method_id', 0).
 
-To add tags: scan each physical tag, note the hex ID printed to the TD
-Textport, and add it to RFID_TO_METHOD below.
+Tag registration workflow:
+  1. Put a Serial Monitor on the ESP32 OR watch the TD textport
+  2. Tap each physical tag once — UID prints as "[serial_rfid] UNKNOWN TAG: XXXX"
+  3. Open data/methods_db.json
+  4. Replace the rfid_tag placeholder for that method with the real UID
+  5. Save — TD reads the JSON live, no restart needed
 """
+import json
+import os
 
-# Map RFID hex IDs → method index.
-# Sourced from data/methods_db.json → methods[*].rfid_tag
-# NOTE: these are placeholder UIDs — Person 7 (hardware) must replace them
-# with real tag IDs read from the physical RFID pedestal before the demo.
-RFID_TO_METHOD = {
-    '00000000': 0,   # NONE / Reset
-    'A1B2C3D4': 1,   # MASONRY
-    'E5F6A7B8': 2,   # 3D PRINTED
-    'C9D0E1F2': 3,   # PREFAB
-    'A3B4C5D6': 4,   # RECLAIMED BRICK (baseline)
+
+# Optional: hardcoded fallback if methods_db.json can't be found.
+# In normal operation this is overridden by the JSON.
+FALLBACK_RFID_TO_METHOD = {
+    '00000000': 0,
 }
 
-METHOD_NAMES = {0: 'NONE', 1: 'MASONRY', 2: '3D PRINTED', 3: 'PREFAB', 4: 'RECLAIMED BRICK'}
+FALLBACK_METHOD_NAMES = {
+    0: 'NONE',
+    1: 'MASONRY',
+    2: '3D PRINTED',
+    3: 'PREFAB',
+    4: 'RECLAIMED BRICK',
+}
 
 
+# ---------------------------------------------------------------------------
+# Mapping loader
+# ---------------------------------------------------------------------------
+def _load_mapping():
+    """Build {uid_hex_upper: method_id} from methods_db.json.
+
+    Looks for the JSON in two places:
+      1. op('methods_db').text — if a Text DAT named 'methods_db' loads it
+      2. project.folder + '/data/methods_db.json' — direct file read
+
+    Falls back to FALLBACK_RFID_TO_METHOD on any failure.
+    """
+    # Try DAT first (preferred — picks up edits live)
+    db_dat = op('methods_db')
+    if db_dat is not None:
+        try:
+            db = json.loads(db_dat.text)
+            return _extract_mapping(db), _extract_names(db)
+        except Exception as e:
+            print(f'[serial_rfid] methods_db DAT parse failed: {e}')
+
+    # Try direct file read as fallback
+    try:
+        project_dir = project.folder
+        path = os.path.join(project_dir, 'data', 'methods_db.json')
+        with open(path, 'r', encoding='utf-8') as f:
+            db = json.load(f)
+        return _extract_mapping(db), _extract_names(db)
+    except Exception as e:
+        print(f'[serial_rfid] methods_db.json read failed: {e}')
+
+    print('[serial_rfid] using FALLBACK_RFID_TO_METHOD')
+    return FALLBACK_RFID_TO_METHOD, FALLBACK_METHOD_NAMES
+
+
+def _extract_mapping(db):
+    mapping = {}
+    for m in db.get('methods', []):
+        tag = m.get('rfid_tag')
+        if tag:
+            mapping[tag.upper()] = m['id']
+    return mapping
+
+
+def _extract_names(db):
+    return {m['id']: m['name'] for m in db.get('methods', [])}
+
+
+# ---------------------------------------------------------------------------
+# Serial DAT callbacks
+# ---------------------------------------------------------------------------
 def onReceive(dat, rowIndex, message, bytes):
-    """Called by TD for each complete line received on the serial port."""
     line = message.strip()
 
-    # Discovery mode: print any unrecognised tag so you can add it above
     if line.startswith('RFID:'):
         tag = line[5:].upper()
-        method_id = RFID_TO_METHOD.get(tag, None)
+        mapping, names = _load_mapping()
+        method_id = mapping.get(tag, None)
         if method_id is None:
-            print(f'[serial_rfid] UNKNOWN TAG: {tag}  — resetting to NONE. Add to RFID_TO_METHOD if needed.')
+            print(f'[serial_rfid] UNKNOWN TAG: {tag}  '
+                  f'— add it to data/methods_db.json → methods[*].rfid_tag, then save')
             dat.store('method_id', 0)
             return
         dat.store('method_id', method_id)
-        print(f'[serial_rfid] tag={tag}  method_id={method_id} ({METHOD_NAMES[method_id]})')
+        name = names.get(method_id, '?')
+        print(f'[serial_rfid] tag={tag}  method_id={method_id} ({name})')
 
     elif line.startswith('HB:'):
-        # optional heartbeat from ESP32 firmware, e.g. "HB:42"
+        # heartbeat from ESP32 — confirms reader is alive
         pass
 
     elif line:
