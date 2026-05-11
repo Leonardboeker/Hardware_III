@@ -1,18 +1,6 @@
 """
-Guided Building Sketch — main application  (Spout edition)
-============================================================
-
-Same as main.py but streams two live textures into TouchDesigner via Spout:
-
-  vision2_camera  — full camera frame with all CV overlays drawn on top
-  vision2_sketch  — clean black canvas with sketch lines only (no camera)
-
-In TouchDesigner add a Spout In TOP for each sender name above.
-Use vision2_camera as a background/reference and vision2_sketch as a
-compositing layer you can blend, colour-grade, or feed into a shader.
-
-Install Spout dependencies once:
-    pip install SpoutGL PyOpenGL
+Guided Building Sketch — main application
+==========================================
 
 Setup
 -----
@@ -23,7 +11,7 @@ Setup
 4. Measure the physical distance (mm) between marker centres and update
    PHYSICAL_W_MM / PHYSICAL_H_MM in extrusion.py.
 5. Run calibrate.py once (checkerboard) — saves calibration.npz.
-6. Run:  python main_spout.py
+6. Run:  python main.py
 
 Red puck (point placement — puck must be inside the working plane)
 ------------------------------------------------------------------
@@ -41,8 +29,9 @@ Keys
 ----
   Q  quit
   P  toggle working-plane debug window
-  S  toggle Spout streaming on/off
 """
+
+import os
 
 import cv2
 import numpy as np
@@ -61,16 +50,6 @@ from sketch           import BuildingSketch
 from extrusion        import load_calibration, estimate_pose, draw_walls
 from osc_bridge       import VisionBridge
 
-# ── Spout (optional — graceful fallback if not installed) ─────────────────────
-try:
-    import SpoutGL
-    from OpenGL import GL as _GL
-    _SPOUT_OK = True
-except ImportError:
-    _SPOUT_OK = False
-    print("[Spout] SpoutGL / PyOpenGL not found — Spout disabled.")
-    print("        Install with:  pip install SpoutGL PyOpenGL")
-
 SHOW_PLANE = True
 
 BUILD_LABELS = {
@@ -79,65 +58,90 @@ BUILD_LABELS = {
     22: "Prefab",
 }
 
-# Spout sender names — match these exactly in TD's Spout In TOP
-SPOUT_CAM_NAME    = "vision2_camera"   # camera frame + all CV overlays
-SPOUT_SKETCH_NAME = "vision2_sketch"   # clean sketch lines on black
+
+def _open_camera(idx: int):
+    """Open the MX Brio via DSHOW, set resolution before first read, warm up."""
+    for w, h in ((1920, 1080), (1280, 720)):
+        cap = cv2.VideoCapture(idx, cv2.CAP_DSHOW)
+        if not cap.isOpened():
+            break
+        cap.set(cv2.CAP_PROP_FRAME_WIDTH,  w)
+        cap.set(cv2.CAP_PROP_FRAME_HEIGHT, h)
+        cap.set(cv2.CAP_PROP_FPS, 30)
+        cap.set(cv2.CAP_PROP_AUTOFOCUS, 1)
+        for _ in range(10):
+            cap.read()
+        ret, frame = cap.read()
+        if ret and frame is not None and frame.size > 0:
+            actual_w = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+            actual_h = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+            print(f"[CAM] index {idx} | DSHOW | {actual_w}x{actual_h} @ 30 fps")
+            return cap
+        cap.release()
+    return None
 
 
 def _find_external_camera():
-    for idx in range(1, 5):
+    env_idx = os.environ.get("CAM_INDEX")
+    if env_idx is not None:
+        idx = int(env_idx)
+        print(f"[CAM] CAM_INDEX override → index {idx}")
+        return idx
+
+    # Probe 0-4 with DSHOW; use the FIRST non-zero index that delivers frames.
+    # (Higher indices are often virtual/OBS devices that open but don't stream.)
+    working = []
+    for idx in range(5):
         cap = cv2.VideoCapture(idx, cv2.CAP_DSHOW)
         if cap.isOpened():
-            ret, _ = cap.read()
+            ret, frame = cap.read()
             cap.release()
-            if ret:
-                print(f"[CAM] Using external camera at index {idx}")
-                return idx
-    print("[CAM] WARNING: no external camera found — falling back to built-in webcam (index 0)")
-    return 0
+            if ret and frame is not None and frame.size > 0:
+                working.append(idx)
+
+    if not working:
+        print("[CAM] WARNING: no camera detected — defaulting to index 0")
+        return 0
+
+    externals = [i for i in working if i != 0]
+    chosen = externals[0] if externals else working[0]
+    print(f"[CAM] Cameras found: {working}  — using index {chosen} (MX Brio)")
+    return chosen
 
 
-def _make_spout_senders():
-    """Initialise both Spout senders. Returns (cam_sender, sketch_sender) or (None, None)."""
-    if not _SPOUT_OK:
-        return None, None
-    try:
-        cam = SpoutGL.SpoutSender()
-        cam.setSenderName(SPOUT_CAM_NAME)
-        skc = SpoutGL.SpoutSender()
-        skc.setSenderName(SPOUT_SKETCH_NAME)
-        print(f"[Spout] Streaming  '{SPOUT_CAM_NAME}'  +  '{SPOUT_SKETCH_NAME}'  → TD port")
-        return cam, skc
-    except Exception as e:
-        print(f"[Spout] Init failed: {e}")
-        return None, None
-
-
-def _spout_send(sender, bgr_img, name):
-    """Convert BGR → RGB and push to Spout. Silently skips on error."""
-    if sender is None:
-        return
-    try:
-        h, w = bgr_img.shape[:2]
-        rgb = cv2.cvtColor(bgr_img, cv2.COLOR_BGR2RGB)
-        sender.sendImage(rgb.tobytes(), w, h, _GL.GL_RGB, False, 0)
-        sender.setFrameSync(name)
-    except Exception:
-        pass
+def _switch_camera(cap, current_id: int) -> tuple:
+    """Release current camera, open the next available index. Returns (new_cap, new_id)."""
+    cap.release()
+    # Build list of working indices excluding the one we're leaving
+    working = []
+    for idx in range(5):
+        c = cv2.VideoCapture(idx, cv2.CAP_DSHOW)
+        if c.isOpened():
+            ret, frame = c.read()
+            c.release()
+            if ret and frame is not None and frame.size > 0:
+                working.append(idx)
+    if not working:
+        print("[CAM] No other camera found — staying on current")
+        new_id = current_id
+    else:
+        others = [i for i in working if i != current_id]
+        new_id = others[0] if others else working[0]
+    new_cap = _open_camera(new_id)
+    if new_cap is None:
+        print(f"[CAM] Could not open index {new_id}")
+        new_cap = _open_camera(current_id)
+        new_id  = current_id
+    print(f"[CAM] Switched to index {new_id}")
+    return new_cap, new_id
 
 
 def main():
     cam_id = _find_external_camera()
-    cap = cv2.VideoCapture(cam_id, cv2.CAP_DSHOW)
-    if not cap.isOpened():
-        cap = cv2.VideoCapture(cam_id)
-    if not cap.isOpened():
-        print(f"Cannot open camera {cam_id}")
+    cap = _open_camera(cam_id)
+    if cap is None:
+        print(f"[CAM] ERROR: could not open camera index {cam_id} — try setting CAM_INDEX manually")
         return
-
-    cap.set(cv2.CAP_PROP_FRAME_WIDTH,  1280)
-    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
-    cap.set(cv2.CAP_PROP_AUTOFOCUS, 0)   # manual Arducam lens
 
     # Camera calibration (needed for accurate 3-D projection)
     K, dist = load_calibration()
@@ -147,10 +151,6 @@ def main():
     sketch   = BuildingSketch()
     bridge   = VisionBridge()
 
-    # Spout senders
-    spout_cam, spout_sketch = _make_spout_senders()
-    spout_enabled = _SPOUT_OK
-
     H = H_inv = None          # homography — persists between frames
     rvec = tvec = None        # camera pose — persists between frames
     corner_pixels = None      # last known marker pixel positions
@@ -159,10 +159,18 @@ def main():
 
     print(__doc__)
 
+    _fail = 0
     while True:
         ret, frame = cap.read()
         if not ret:
+            _fail += 1
+            if _fail == 1:
+                print("[CAM] WARNING: no frame received — check cable / camera permissions")
+            if _fail > 60:
+                print("[CAM] ERROR: camera feed lost after 60 consecutive failures — exiting")
+                break
             continue
+        _fail = 0
 
         # ── 1. ArUco: update working plane ──────────────────────────────
         new_H, new_H_inv, build_markers, new_corners = detect_working_plane(frame)
@@ -179,7 +187,8 @@ def main():
         g_puck = puck.process(frame)
         g_hand = gestures.process(frame)
 
-        # ── 3b. Send all state to TouchDesigner via OSC ─────────────────
+        # ── 3b. Send all state to TouchDesigner via OSC ──────────────────
+        # Hand gesture takes priority in the bridge when it is active.
         bridge.send_frame(
             build_markers=build_markers,
             gesture_result=g_hand if g_hand['gesture'] != 'none' else g_puck,
@@ -189,10 +198,12 @@ def main():
         )
 
         # ── 4. Map positions → working plane ────────────────────────────
+        # Puck centre → point placement
         tip_cam   = g_puck['index_tip_cam']
         tip_plane = cam_to_plane(tip_cam, H)
         tip_valid = is_inside_plane(tip_plane)
 
+        # Hand index tip → wall selection for add_window
         hand_cam   = g_hand['index_tip_cam']
         hand_plane = cam_to_plane(hand_cam, H)
         hand_valid = is_inside_plane(hand_plane)
@@ -247,25 +258,10 @@ def main():
 
         puck.draw(frame, g_puck)
         gestures.draw(frame, g_hand)
-        _draw_status(frame, H, sketch, tip_valid, is_extruded, spout_enabled)
+        _draw_status(frame, H, sketch, tip_valid, is_extruded)
 
         cv2.imshow("Building Sketch", frame)
 
-        # ── 7. Spout — stream frames to TouchDesigner ───────────────────
-        if spout_enabled:
-            # Stream 1: full camera frame with all overlays
-            _spout_send(spout_cam, frame, SPOUT_CAM_NAME)
-
-            # Stream 2: clean sketch-only canvas on black (no camera noise)
-            sketch_canvas = np.zeros((PLANE_H, PLANE_W, 3), dtype=np.uint8)
-            sketch.draw_on_plane(sketch_canvas)
-            if tip_valid:
-                tx, ty = int(tip_plane[0]), int(tip_plane[1])
-                cv2.circle(sketch_canvas, (tx, ty), 6, (0, 180, 255), -1)
-                cv2.circle(sketch_canvas, (tx, ty), 12, (0, 180, 255), 1)
-            _spout_send(spout_sketch, sketch_canvas, SPOUT_SKETCH_NAME)
-
-        # ── 8. Working-plane debug window ───────────────────────────────
         if show_plane:
             plane_img = np.zeros((PLANE_H, PLANE_W, 3), dtype=np.uint8)
             sketch.draw_on_plane(plane_img)
@@ -281,10 +277,8 @@ def main():
             show_plane = not show_plane
             if not show_plane:
                 cv2.destroyWindow("Working Plane (top-down)")
-        if key == ord('s'):
-            spout_enabled = not spout_enabled
-            state = "ON" if spout_enabled else "OFF"
-            print(f"[Spout] Streaming {state}")
+        if key == ord('t'):
+            cap, cam_id = _switch_camera(cap, cam_id)
 
     gestures.close()
     cap.release()
@@ -293,10 +287,11 @@ def main():
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
-def _draw_status(frame, H, sketch, tip_valid, is_extruded, spout_on):
-    n_pts = len(sketch.points)
-    n_seg = len(sketch.get_wall_segments())
-    n_win = len(sketch.windows)
+def _draw_status(frame, H, sketch, tip_valid, is_extruded):
+    h      = frame.shape[0]
+    n_pts  = len(sketch.points)
+    n_seg  = len(sketch.get_wall_segments())
+    n_win  = len(sketch.windows)
 
     if H is None:
         msg   = "WORKING PLANE NOT DETECTED  — show IDs 0,1,2,3 at table corners"
@@ -304,9 +299,8 @@ def _draw_status(frame, H, sketch, tip_valid, is_extruded, spout_on):
     else:
         in_out = "IN PLANE" if tip_valid else "outside"
         mode   = "3D EXTRUDED" if is_extruded else "2D sketch"
-        spout  = "SPOUT:ON" if spout_on else "SPOUT:OFF"
         msg    = (f"Pts:{n_pts}  Walls:{n_seg}  Win:{n_win}  "
-                  f"|  puck:{in_out}  |  {mode}  |  {spout}")
+                  f"|  puck:{in_out}  |  {mode}")
         color  = (0, 200, 100) if is_extruded else (200, 200, 200)
 
     cv2.putText(frame, msg, (10, 28), cv2.FONT_HERSHEY_SIMPLEX, 0.55, color, 2)

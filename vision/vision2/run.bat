@@ -7,6 +7,9 @@ set "VENV=%ROOT%.venv"
 set "PY=%VENV%\Scripts\python.exe"
 set "PIP=%VENV%\Scripts\pip.exe"
 
+:: MX Brio is always index 1 on this machine (index 0 = built-in, index 2 = virtual)
+if not defined CAM_INDEX set "CAM_INDEX=1"
+
 echo.
 echo  ============================================================
 echo   Building Sketch  ^|  ArUco Working Plane + Hand Gestures

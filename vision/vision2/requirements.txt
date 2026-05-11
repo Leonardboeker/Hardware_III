@@ -6,8 +6,3 @@ trimesh>=4.0.0
 # OSC → TouchDesigner bridge (used by osc_bridge.py)
 python-osc>=1.8.0
 
-# Spout → TouchDesigner live texture streaming (used by main_spout.py)
-# NOTE: SpoutGL is Windows-only and supports up to Python 3.12.
-#       On Python 3.13 install may fail — downgrade to 3.12 if needed.
-SpoutGL>=0.2.4
-PyOpenGL>=3.1.7
