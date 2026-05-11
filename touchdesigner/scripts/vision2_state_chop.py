@@ -89,14 +89,27 @@ def cook(scriptOp):
         hb_alive = 0
 
     # ── Puck positions (sketch footprint points) ──────────────────────────────
+    # Vision2 sends /puck/N (i f f) — frame, x, y.
+    # TD names multi-arg OSC channels in different ways depending on version:
+    #   - 'puck/N:0', 'puck/N:1', 'puck/N:2'  (colon, 0-based)
+    #   - 'puck/N0',  'puck/N1',  'puck/N2'   (no colon, 0-based)
+    #   - 'puck/N1',  'puck/N2',  'puck/N3'   (no colon, 1-based — confirmed for Leo's TD)
+    # Try them all and pick the first that resolves.
+    def _puck_arg(pid: int, arg_idx: int):
+        for name in (
+            f'puck/{pid}:{arg_idx}',
+            f'puck/{pid}{arg_idx}',
+            f'puck/{pid}{arg_idx + 1}',
+        ):
+            try:
+                return vision[name][0]
+            except Exception:
+                pass
+        return None
+
     pucks: dict[int, tuple[float, float]] = {}
     for pid in FOOTPRINT_IDS:
-        # Vision2 sends /puck/N (i f f) → TD names channels as puck/N:0/:1/:2
-        # (with colon) — but some TD versions / OSC In configurations name them
-        # puck/N0, puck/N1, puck/N2 (no colon). Try both.
-        pf = _chan(vision, f'puck/{pid}:0', None)
-        if pf is None:
-            pf = _chan(vision, f'puck/{pid}0', None)
+        pf = _puck_arg(pid, 0)
         if pf is None:
             continue
         try:
@@ -105,12 +118,8 @@ def cook(scriptOp):
             continue
         if hb < 0 or abs(hb - pf) > LIVENESS_FRAMES:
             continue
-        px = _chan(vision, f'puck/{pid}:1', None)
-        if px is None:
-            px = _chan(vision, f'puck/{pid}1', None)
-        py = _chan(vision, f'puck/{pid}:2', None)
-        if py is None:
-            py = _chan(vision, f'puck/{pid}2', None)
+        px = _puck_arg(pid, 1)
+        py = _puck_arg(pid, 2)
         if px is None or py is None:
             continue
         try:
