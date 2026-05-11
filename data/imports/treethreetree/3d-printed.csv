@@ -1,0 +1,35 @@
+phase,parameter,value_low,value_high,unit,assumption,source,source_tier
+foundation,co2_kg_per_m2,25,60,kg CO2eq / m2 GFA,Conventional RC slab - 3DP houses do NOT print foundations; lower = GGBS-blended cement; upper = thick footing + 100% OPC; borrowed from masonry strand 01,EN 15804 + masonry strand 01,2
+foundation,labor_hours_per_m2,1.5,3.5,h / m2 GFA,Conventional rebar + form + pour; no 3DP-specific deviation,masonry strand 01,2
+foundation,time_days,3,7,calendar days,Form + pour + cure; conventional; overlaps with structure print prep,masonry strand 01,2
+foundation,cost_eur_per_m2,80,180,EUR / m2 GFA,Catalonia 2025 reinforced slab; range reflects ground conditions; not 3DP-specific,masonry strand 01,2
+foundation,material_origin,NA,NA,qualitative,Aggregates <100km (Catalan quarries); cement Spanish/EU; rebar Spanish/EU; no 3DP-specific deviation,masonry strand 01,2
+structure,co2_kg_per_m2,44,90,kg CO2eq / m2 wall,T1 anchor: Mohammad 2020 - 44.42 (lightweight unreinforced 3DCP) to 58.89 (conventional concrete) kg CO2eq/m2 wall A1-A3; upper 90 = reinforced 3DCP where rebar pushes GWP ABOVE conventional; cement-content wobble: low = geopolymer/LC3 high = 30% OPC printable mix. WALL UNIT not GFA - multiply by 0.6-0.8 wall:GFA ratio for GFA comparison,Mohammad 2020,1
+structure,co2_kg_per_m2_material,250,450,kg CO2eq / m3 printable concrete,Material-level range: ~250 (LC3/calcined clay) to ~450 (high-OPC self-leveling); convert via wall thickness 0.30m = 75-135 kg CO2eq/m2 wall,Motalebi 2024 review,1
+structure,co2_kg_per_m2,58,147,kg CO2eq / m2 GFA,Whole-house comparison: Rossi 2024 reports 3DP houses avg 58 vs conventional 147; CAVEATS: small sample n=4 vs n=10; heterogeneous climate/insulation; no normalization - use as sanity check ONLY,Rossi 2024,1
+structure,co2_kg_per_m2_earth,12,25,kg CO2eq / m2 wall,3D-PRINTED EARTH (cob/clay): Alhumayani 2020 reports ~80% reduction vs 3DPC for wall element A1-A4 foundation+roof+openings excluded; most defensible for Catalonia context (TOVA Collserola); printer electricity is dominant remaining contributor,Alhumayani 2020,1
+structure,co2_kg_per_m2_catalan,NA,NA,kg CO2eq / m2 GFA,GEOGRAPHIC GAP: no published LCA for TOVA TerraPerforma or any Catalan 3DP project. Catalan figures do not exist. Flag mandatory in projection.,NA,missing
+structure,printer_electricity_per_m2,1,12,kg CO2eq / m2 wall,Electricity-only contribution; <5% of total in most LCAs (Mohammad 2020; Motalebi 2024); TECLA = 1200 kWh / 60m2 = 20 kWh/m2 GFA = ~6 kg CO2eq/m2 at EU grid; cob 3DP electricity share HIGHER as fraction because cement excluded,Mohammad 2020 + WASP TECLA,1
+structure,labor_hours_per_m2,0.3,1.2,h / m2 wall,Vendor + T1: 2-operator print of 500m2 (La Tour) in 150h = 0.3 h/m2 wall; CyBe ~6 min/m2 print + supervision; upper = setup/teardown amortized over small projects,Allouzi 2020 + CyBe (T3 sibling),1
+structure,labor_hours_per_m2_vendor,0.1,0.5,h / m2 wall,VENDOR CLAIM: CyBe + COBOD ~6 min/m2 active print 2 operators; excludes setup mix-prep post-processing; confirms direction not magnitude,CyBe / COBOD (vendor),3
+structure,time_days,1,7,calendar days,T1+T3: ICON Wolf Ranch days; TECLA 60m2 = 200h print = ~8 days; ICON 230m2 = ~18h pure print; setup/teardown adds; range = small dwelling 3DP-only print; EXCLUDES foundation cure + conventional roof/openings,Wikipedia TECLA + ICON press + Mohammad 2020,1
+structure,time_days_vendor,1,4,calendar days,VENDOR CLAIM: ICON/Apis Cor "house in 24 hours" = printing-only shell wall NOT including foundation roof finishing,Apis Cor + ICON (vendor),3
+structure,cost_eur_per_m2,200,600,EUR / m2 wall,Vendor + T1: Apis Cor 2017 ~250 EUR/m2 shell only (Russian context); Allouzi 2020 material cost reduction in Jordan; upper = EU labour + EU printable-mix premium; EXCLUDES rebar where added,Allouzi 2020 + Apis Cor (T3 sibling),1
+structure,cost_eur_per_m2_vendor,200,400,EUR / m2 wall,VENDOR CLAIM: Apis Cor + COBOD/PERI; PERI Heidelberg reported ~10% cost reduction vs conventional; lower-bound figures are demonstrator-context,Apis Cor + COBOD (vendor),3
+structure,material_origin,NA,NA,qualitative,3DPC: cement Spanish/EU; aggregates Catalan <100km; admixtures EU. 3DP-earth: earth WITHIN 50m of site (TOVA verified); fibre stabilizers local (rice husk TECLA; aloe/egg TOVA). Earth is strongest material-origin argument for Catalonia.,IAAC TOVA + WASP TECLA,3
+structure,material_origin_t1,NA,NA,qualitative,Alhumayani 2020 confirms cob 3DP material can be near-100% local; printable concrete necessarily imports cement clinker from regional kilns,Alhumayani 2020,1
+roof,co2_kg_per_m2,30,90,kg CO2eq / m2 GFA,Conventional roof - NOT printed; timber/steel + insulation + membrane; range from masonry strand 01,masonry strand 01,2
+roof,labor_hours_per_m2,1.5,4.0,h / m2 GFA,Conventional roof labour; no 3DP deviation,masonry strand 01,2
+roof,time_days,4,10,calendar days,Conventional roof construction,masonry strand 01,2
+roof,cost_eur_per_m2,60,200,EUR / m2 GFA,Catalonia conventional roof,masonry strand 01,2
+roof,material_origin,NA,NA,qualitative,Conventional: timber from EU/Catalan forests; steel from Spanish/EU mills; insulation from EU producers,masonry strand 01,2
+openings,co2_kg_per_m2,8,30,kg CO2eq / m2 GFA,Windows + doors NOT 3DP; conventional aluminium/PVC/wood frames + double/triple glazing; printers leave openings as voids,masonry strand 01,2
+openings,labor_hours_per_m2,0.4,1.2,h / m2 GFA,Conventional install; 3DP printers leave openings as voids - install is conventional using templating,masonry strand 01,2
+openings,time_days,2,5,calendar days,Conventional,masonry strand 01,2
+openings,cost_eur_per_m2,80,250,EUR / m2 GFA,Catalonia 2025 windows + doors,masonry strand 01,2
+openings,material_origin,NA,NA,qualitative,Aluminium frames EU; glass EU; locks/hinges global,masonry strand 01,2
+finishing,co2_kg_per_m2,10,40,kg CO2eq / m2 GFA,3DP walls have corrugated rib texture - vendors claim no plaster needed (saves carbon); reality: most projects apply primer+paint+skim coat; lower = unfinished+paint; upper = full skim+paint+interior plaster,masonry strand 01,2
+finishing,labor_hours_per_m2,0.5,2.5,h / m2 GFA,Same trade-off: vendor minimal-finishing claim often optimistic; see SYNTHESIS wobble #6,masonry strand 01,2
+finishing,time_days,3,10,calendar days,Conventional finishing schedule,masonry strand 01,2
+finishing,cost_eur_per_m2,30,120,EUR / m2 GFA,Catalonia interior + exterior finish; lower = paint only on rib texture (vendor claim); upper = conventional skim+paint,masonry strand 01,2
+finishing,material_origin,NA,NA,qualitative,Paint EU; plaster Spanish/EU,masonry strand 01,2

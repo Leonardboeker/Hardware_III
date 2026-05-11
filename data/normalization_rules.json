@@ -1,0 +1,18 @@
+{
+  "wall_to_gfa_ratio": 1.8,
+  "default_wall_thickness_m": {
+    "masonry": 0.2,
+    "3d_printed": 0.25,
+    "reclaimed_brick": 0.2
+  },
+  "time_scaling": {
+    "calendar_days": "do_not_multiply_by_area",
+    "total_days": "do_not_multiply_by_area",
+    "days_per_m2": "multiply_by_area",
+    "days_per_m2_gfa": "multiply_by_gross_floor_area"
+  },
+  "notes": {
+    "shape_factor": "Preserve as metadata only. Do not apply automatically in the standalone normalization engine.",
+    "prefab": "Prefab stays lifecycle-based and is not forced into foundation/structure/roof/openings/finishing."
+  }
+}

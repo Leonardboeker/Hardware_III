@@ -1,0 +1,26 @@
+phase,parameter,value_low,value_high,unit,assumption,source,source_tier
+foundation,co2_kg_per_m2,70,130,kg CO2eq / m2 GFA,RC strip foundation ~0.35m3 concrete + ~25kg rebar per m2 GFA; A1-A3 only; CEM I upper bound CEM II/B-M lower bound,izaola-2023; mateus-2023,1
+foundation,labor_hours_per_m2,1.5,3.0,h / m2 GFA,Excavation + steel placement + pour + cure for shallow strip foundation; range from CYPE neighbouring lines + Spanish bricklayer defaults,cype-spain-fef010,2
+foundation,time_days,7,14,calendar days,Strip foundation cure time governs; single-family detached site normal weather EHE-08 minimum cure,UNKNOWN,NA
+foundation,cost_eur_per_m2,50,110,EUR / m2 GFA,Spanish 2025-2026 vintage from CYPE-adjacent items; widened because CYPE foundation URL returned 403 at fetch,cype-spain-fef010,2
+foundation,material_origin,NA,NA,qualitative,Catalan/Spanish RC: cement (Catalan kilns dominant) aggregates (Catalan quarries <50km) rebar (Spanish recycled-content steel Catalan+Basque mills); concrete A4 transport typically <30km,bedec-2026,1
+structure,co2_kg_per_m2,32,75,kg CO2eq / m2 wall,Single-leaf perforated clay brick 24cm; Hispalyt 008-017 GWP A1-A3 = 209 kg CO2eq/tonne x ~140 kg/m2 wall; lower = lime-rich M-2.5 mortar; upper = double-leaf cavity wall,hispalyt-008-017; hispalyt-008-016; mateus-2023,1
+structure,labor_hours_per_m2,0.7,1.5,h / m2 wall,CYPE FEF010 load-bearing perforated brick: 0.99 h/m2; CYPE FFZ010 exterior facing leaf: 0.685 h/m2; range covers single-leaf vs double-leaf,cype-spain-fef010; cype-spain-ffz010,1
+structure,time_days,10,25,calendar days,Two-storey unifamiliar shell 2 masons + 1 helper crew 80-100 m2 wall/day; not verified from primary source,UNKNOWN,NA
+structure,cost_eur_per_m2,20,35,EUR / m2 wall,CYPE FEF010 = EUR25.73/m2 load-bearing perforated brick; CYPE FFZ010 = EUR20.13/m2 non-structural facing leaf,cype-spain-fef010; cype-spain-ffz010,1
+structure,material_origin,NA,NA,qualitative,Catalan kilns: clay from local Catalan/Aragon quarries; Hispalyt EPD A4 = 87km block / 296km facing brick (national avg - Catalan project closer to 87km),hispalyt-008-016; hispalyt-008-017,1
+roof,co2_kg_per_m2,25,70,kg CO2eq / m2 roof,Hispalyt 008-001 clay tiles A1-A3 = 199 kg CO2eq/tonne x ~40-45 kg/m2 = 8-8.9 kg/m2 tiles; + RC slab + timber battens + insulation = 17-60 kg/m2 depending on slab thickness,hispalyt-008-001; izaola-2023; mateus-2023,1
+roof,labor_hours_per_m2,0.8,2.0,h / m2 roof,Tile-laying 5-12 m2/day per oficial in Spanish residential; range covers single-tile pitched roof (low) to complex insulated cubierta a la catalana (high),rejected-cype-roof,3
+roof,time_days,4,10,calendar days,Order-of-magnitude derived from labour-rate estimate only,UNKNOWN,NA
+roof,cost_eur_per_m2,50,90,EUR / m2 roof,CYPE-adjacent items + IVE Costes de Construccion typical Spanish roof EUR60-80/m2; widened because primary CYPE roof URL was 404,rejected-cype-roof,3
+roof,material_origin,NA,NA,qualitative,Catalan clay tiles: La Escandella (Alicante) Ceramica La Coma (Girona) Tejas Borja (Valencia) - all Spanish kilns; A4 transport ~287km national avg; local sourcing <200km common in Catalonia,hispalyt-008-001,1
+openings,co2_kg_per_m2,30,90,kg CO2eq / m2 opening area,Aluminium-frame double-glazed window dominates Spanish residential; aluminium frames 150-250 kg CO2/m2 of frame; double glazing ~25 kg CO2/m2 glass; per m2 GFA openings ~15% of facade,izaola-2023; de-wolf-2017,2
+openings,labor_hours_per_m2,1.0,2.5,h / m2 opening,Lintel + frame install + glazing + sealant; range from Spanish rehabilitation rates; no primary CYPE retrieval,UNKNOWN,NA
+openings,time_days,2,5,calendar days,Per opening including curing of lintel mortar; order-of-magnitude,UNKNOWN,NA
+openings,cost_eur_per_m2,150,450,EUR / m2 opening area,Aluminium-frame thermal-break double-glazed window in Spain typically EUR250-400/m2; lower bound is timber/PVC simple glazing,UNKNOWN,NA
+openings,material_origin,NA,NA,qualitative,Aluminium frames extruded in Spain (Cortizo Technal-iberia) or imported from EU; Spanish extruders use European recycled-content billet; glass from Saint-Gobain Spain (Aviles La Granja),UNKNOWN,NA
+finishing,co2_kg_per_m2,15,50,kg CO2eq / m2 finished surface,Cement-mortar render ~10-25 kg CO2/m2; gypsum plaster ~4-8 kg/m2; paint 2 coats ~1-3 kg/m2; ceramic floor tile ~8-15 kg/m2; range: revoco-mortar+paint (low) to full ceramic-clad bathroom (high),mateus-2023; izaola-2023,2
+finishing,labor_hours_per_m2,0.5,2.0,h / m2 finished surface,Plastering 0.4-0.8 h/m2; painting 0.2-0.4 h/m2; floor-tile 0.7-1.2 h/m2,UNKNOWN,NA
+finishing,time_days,5,15,calendar days,Plaster cure (3-7 days) + paint cure between coats + tile-grout cure,UNKNOWN,NA
+finishing,cost_eur_per_m2,25,75,EUR / m2 finished surface,Spanish 2025-2026 IVE/CYPE-adjacent rates; range: plaster-and-paint only (low) to full ceramic-clad surface (high),UNKNOWN,NA
+finishing,material_origin,NA,NA,qualitative,Cement-mortar from Spanish kilns (Cementos Molins Cemex Espana); gypsum from Spanish quarries (Almeria/Aragon); paint from Spanish manufacturers (Titan Procolor); ceramic tile from Castellon cluster (~600km from Barcelona),UNKNOWN,NA
