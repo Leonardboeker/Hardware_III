@@ -61,8 +61,7 @@ def detect_working_plane(frame):
         src = np.array(src_corners, dtype=np.float32)
         H,     _ = cv2.findHomography(src, _DST)
         H_inv, _ = cv2.findHomography(_DST, src)
-        if H is not None:
-            corner_pixels = src   # shape (4, 2), order TL TR BR BL
+        corner_pixels = src   # shape (4, 2), order TL TR BR BL
 
     return H, H_inv, build_markers, corner_pixels
 

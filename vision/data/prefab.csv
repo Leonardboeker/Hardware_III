@@ -1,0 +1,39 @@
+phase,parameter,value_low,value_high,unit,assumption,source,source_tier,sub_method
+A1-A3,embodied_carbon,280,569,kg CO2eq / m2 GFA,High-rise concrete MiC structural+envelope; Hong Kong typology transferable to EU with caveat; no biogenic relevance,Wei 2024; Pan & Hon 2012,1,modular_concrete
+A1-A3,embodied_carbon_spread,105,864,kg CO2eq / m2 GFA,Full literature spread for concrete-modular cases; structural choice + module size dominate variance,Wei 2024,1,modular_concrete
+A1-A3,embodied_carbon_with_biogenic,130,220,kg CO2eq / m2 GFA,CLT mid-rise residential with EN 15804+A2 GWP-bio applied; carbon storage credited; A1-A3 only,Andersen 2022; Hemmati 2024; Stora Enso EPD,1,clt
+A1-A3,embodied_carbon_no_biogenic,220,350,kg CO2eq / m2 GFA,Same buildings with biogenic credit stripped; fossil-only A1-A3; the methodology-wobble swing — ~30% difference,Andersen 2022; Liu 2021,1,clt
+A1-A3,clt_panel_gwp_fossil,50,75,kg CO2eq / m3 panel,Per m3 CLT A1-A3 GWP-fossil only Austrian production; KLH/Stora Enso/Binderholz triangulated,KLH EPD; Stora Enso EPD; Binderholz EPD,1,clt
+A1-A3,clt_panel_biogenic_storage,-762,-700,kg CO2eq / m3 panel,Biogenic carbon stored in panel; sign reverses at EoL if incinerated — stays negative if reused or landfilled,Stora Enso EPD; KLH EPD,1,clt
+A1-A3,material_origin,NA,NA,qualitative,Modular concrete: Hong Kong/UK/NL dominate literature; Spain has emerging fabricators (Moodul Castelldefels; Modular Home Valencia) but no published EPDs. GEOGRAPHIC GAP.,Moodul (vendor),3,modular_concrete
+A1-A3,material_origin,NA,NA,qualitative,CLT: Austria (KLH Stora Enso Binderholz) Sweden (Stora Enso Martinsons) Czech Republic. No Iberian CLT mill at scale as of 2026. Barcelona A4 distance ~1800-2200km road.,KLH EPD; Stora Enso EPD,1,clt
+A1-A3,cost,600,1200,EUR / m2,Material-stage shell only modular concrete; Spain reference; excludes land permits foundations,Moodul (vendor),3,modular_concrete
+A1-A3,cost,700,1100,EUR / m2,CLT panel material cost only ex-works Austrian mill before transport; EUR350-550/m3 * ~2m3/m2 GFA equivalent,Stora Enso EPD; vendor sibling,2,clt
+A1-A3,labour_factory,4,12,h / m2 GFA,Factory hours per m2 finished GFA; modular concrete Hong Kong/European industry data; rises with finishes-included scope,Pan & Hon 2012; industry data,2,modular_concrete
+A1-A3,labour_factory,2,6,h / m2 GFA,CLT panel CNC + lay-up + pressing; lower than modular concrete because CLT is element-based not volumetric,Stora Enso EPD; vendor sibling,2,clt
+A1-A3,factory_lead_time,60,120,calendar days,From order to factory-completion of modules for mid-rise; concurrent with site prep,Pan & Hon 2012; industry data,2,modular_concrete
+A1-A3,factory_lead_time,30,90,calendar days,Order-to-delivery for CLT panel package from Austrian mill; mid-rise residential,KLH EPD; Stora Enso EPD,2,clt
+A4,transport_carbon,8,25,kg CO2eq / m2 GFA,Modular concrete intra-Spain (Moodul Catalonia ~200-500km road); modules heavy+bulky raises per-tonne-km figure,Pan & Hon 2012; Moodul (vendor),2,modular_concrete
+A4,transport_carbon,25,60,kg CO2eq / m2 GFA,CLT Austria→Barcelona ~1800-2200km road; ~0.06 kg CO2eq/tonne-km diesel HGV * panel mass per m2 GFA; CATALONIA-SPECIFIC PENALTY most LCAs ignore,Stora Enso EPD,2,clt
+A4,transport_distance,200,500,km,Modular concrete sourced within Spain; Moodul (Castelldefels) Modular Home (Valencia) to BCN site,Moodul (vendor),3,modular_concrete
+A4,transport_distance,1800,2200,km,Austria → Barcelona road; Sweden → Barcelona 2500-3000km,KLH EPD,1,clt
+A4,transport_cost,30,80,EUR / m2,Heavy-haul abnormal load for volumetric modules within Spain,Moodul (vendor),3,modular_concrete
+A4,transport_cost,80,180,EUR / m2,Multi-truck CLT panel delivery from Austrian mill to Catalan site,NA,missing,clt
+A5,site_carbon,30,80,kg CO2eq / m2 GFA,On-site activity emissions modular concrete; reduced 58% vs cast-in-place equivalent due to compressed schedule,Wei 2024,1,modular_concrete
+A5,site_carbon,15,50,kg CO2eq / m2 GFA,CLT site assembly; lower than modular concrete because lifts lighter and sequence faster,Hemmati 2024; Pan & Hon 2012,2,clt
+A5,site_waste,8,15,kg / m2 GFA,Modular concrete site waste; factory-controlled offcut,Pan & Hon 2012; Wei 2024,1,modular_concrete
+A5,site_waste,5,12,kg / m2 GFA,CLT panel waste on site; offcuts mostly captured at factory,Hemmati 2024; Pan & Hon 2012,2,clt
+A5,site_labour,1.5,4.0,h / m2 GFA,On-site hours modular concrete erection; excludes finishes done off-site,Pan & Hon 2012; Wei 2024,2,modular_concrete
+A5,site_labour,1.0,3.0,h / m2 GFA,On-site hours CLT panel installation; "5-8 days for a 3-bed detached" industry data,Stora Enso EPD; vendor sibling,2,clt
+A5,site_time,0.4,1.0,days / m2 GFA,On-site duration per m2 modular concrete; mainstream EU mid-rise modular,Wei 2024; Pan & Hon 2012,2,modular_concrete
+A5,site_time,0.3,0.8,days / m2 GFA,On-site duration per m2 CLT erection + secondary trades,Hemmati 2024; Pan & Hon 2012,2,clt
+A5,site_cost,200,500,EUR / m2,On-site assembly + crane + labour modular concrete in Spain,Moodul (vendor),3,modular_concrete
+A5,site_cost,250,600,EUR / m2,On-site CLT assembly + finishes start; Spanish carpentry rates applied to CLT industry workflow,NA; Moodul (vendor),missing,clt
+B,service_life,60,100,years,EN 15978 default 60yr; 100yr is building-quality narrative; doubles annualised comparison sensitivity,Andersen 2022,1,both
+B,reuse_potential_modular,1,2,second-life cycles,Volumetric units designed for relocation; Wang Cheong 220 (HK) and Daiwa House (NL) precedent; 25-50yr per cycle,Wei 2024 footnote; Pan & Hon 2012,2,modular_concrete
+B,reuse_potential_clt,0,1,second-life cycles,CLT can in principle be deconstructed but literature thin on actual second-life projects; biggest barrier = panel-edge damage from de-fixing,Hemmati 2024,2,clt
+C,eol_carbon_with_reuse,-150,-50,kg CO2eq / m2 GFA,Net negative when 25-50yr second-life assumed + avoided-burden allocation applied; the "20-26% annualised reduction" relies on this,Wei 2024 footnote; Andersen 2022,1,modular_concrete
+C,eol_carbon_no_reuse,30,80,kg CO2eq / m2 GFA,Demolition + downcycling of concrete modules; no second life,Liu 2021,2,modular_concrete
+C,eol_carbon_clt_incineration,700,800,kg CO2eq / m3,Biogenic carbon released if CLT incinerated; mirror-image of A1 storage — this is C3 release that "balances" the negative A1 figure,Stora Enso EPD; KLH EPD,1,clt
+C,eol_carbon_clt_reuse,0,200,kg CO2eq / m3,If CLT landfilled (slow biodegradation) or reused biogenic carbon stays sequestered for lifespan of next host product,Hemmati 2024,1,clt
+C,reuse_allocation_method,NA,NA,qualitative,Cut-off vs avoided-burden vs PEF Circular Footprint Formula — all three give different signs; EN 15804+A2 module D is EU default but methodologically contested,Andersen 2022; Liu 2021,1,both

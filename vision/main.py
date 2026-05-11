@@ -58,12 +58,10 @@ def _find_external_camera():
         cap = cv2.VideoCapture(idx, cv2.CAP_DSHOW)
         if cap.isOpened():
             ret, _ = cap.read()
-            cap.release()   # always release before deciding
+            cap.release()
             if ret:
                 print(f"[CAM] Using external camera at index {idx}")
                 return idx
-        else:
-            cap.release()   # release even if isOpened() returned False
     print("[CAM] WARNING: no external camera found — falling back to built-in webcam (index 0)")
     return 0
 
@@ -79,7 +77,6 @@ def main():
 
     cap.set(cv2.CAP_PROP_FRAME_WIDTH,  1280)
     cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
-    cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)   # minimise buffer to reduce gesture lag
 
     # Camera calibration (needed for accurate 3-D projection)
     K, dist = load_calibration()
@@ -231,7 +228,6 @@ def _draw_build_markers(frame, build_markers):
         cv2.circle(frame, (cx, cy), 8, (200, 80, 255), -1)
         cv2.putText(frame, label, (cx + 12, cy + 5),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.5, (200, 80, 255), 2)
-
 
 
 if __name__ == '__main__':
