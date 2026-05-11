@@ -254,6 +254,13 @@ Homography TOP
 
 ### E. FSM state machine (CHOP Execute DAT)
 
+> Clarification:
+> This 4-state example is a local micro-FSM sketch for a narrow interaction example.
+> It is **not** the canonical project FSM.
+> The canonical project FSM is:
+> `IDLE -> METHOD -> FOOTPRINT -> HEIGHT -> MATERIALS -> VALIDATED -> PHASE_N -> COMPARISON`
+> See [PROJECT.md](/o:/Hardware_III/.planning/PROJECT.md), [ROADMAP.md](/o:/Hardware_III/.planning/ROADMAP.md), and [fsm_full.py](/o:/Hardware_III/touchdesigner/scripts/fsm_full.py).
+
 States: `IDLE` → `PRESENTING` → `DETAIL` → `COMPARISON`
 
 ```python

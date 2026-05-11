@@ -105,10 +105,10 @@ Inspired by the Swiss Museum's interactive DJ table (ArUco markers + projection 
 
 | Tool | Role |
 |------|------|
-| **TouchDesigner** | Primary development environment |
-| **YOLO plugin (TD)** | Object recognition for markers |
-| **Rhino + Grasshopper** | Geometry and parametric design |
-| **ESP firmware** | RFID + sensor communication |
+| **TouchDesigner 2025** | Primary runtime — FSM, projection, integration |
+| **Python + OpenCV (ArUco)** | Marker detection, OSC out to TD |
+| **Rhino + Grasshopper** | Offline geometry authoring + fabrication only |
+| **ESP32 firmware** | RFID + proximity sensor communication |
 
 ---
 
