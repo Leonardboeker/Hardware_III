@@ -1,0 +1,191 @@
+{
+  "_note": "Imported from origin/treethreetree commits 86ae104 and 5297a5a. RFID tags for ids 1-4 are placeholders until the hardware team assigns the real pedestal tags.",
+  "_metric_engine_notes": {
+    "revenue_estimate": "Not applicable in current project scope. Return null unless the team explicitly adds a business model layer.",
+    "profit_estimate": "Not applicable in current project scope. Return null unless the team explicitly adds a business model layer.",
+    "shape_factor_usage": "Preserve shape factor as a design-sensitivity note only. Do not apply it as a calculation multiplier unless a caller explicitly opts into that behaviour."
+  },
+  "shape_factor_table": {
+    "_note": "Imported from Rafik's branch. Based on perimeter-to-area ratio conventions referenced in the branch notes.",
+    "rectangle": 1.0,
+    "l_shape": 1.12,
+    "u_shape": 1.22,
+    "complex": 1.35
+  },
+  "methods": [
+    {
+      "id": 0,
+      "name": "NONE",
+      "rfid_tag": "00000000",
+      "color_rgb": [0.4, 0.4, 0.4],
+      "min_pucks": 0,
+      "max_pucks": 10,
+      "description": "No construction method selected",
+      "co2_per_m2_range": null,
+      "labor_hours_range": null,
+      "time_range": null,
+      "cost_per_m2_range": null,
+      "source_label": null,
+      "geographic_tier": null,
+      "confidence_range": null,
+      "data_model": null,
+      "display_mode": null,
+      "stages": [],
+      "selected_material_default": null,
+      "revenue_estimate": null,
+      "profit_estimate": null,
+      "data_csv": null
+    },
+    {
+      "id": 1,
+      "name": "MASONRY",
+      "rfid_tag": "A1B2C3D4",
+      "color_rgb": [0.85, 0.45, 0.15],
+      "min_pucks": 2,
+      "max_pucks": 10,
+      "description": "Load-bearing fired-clay brick, hand-laid on site. Catalan tier-1 data: Hispalyt EPDs, BEDEC (ITeC), CYPE. CO2: 205-490 kgCO2e/m2 GFA. Labour: 22-34 h/m2.",
+      "co2_per_m2_range": "205-490 kgCO2e/m2 GFA",
+      "labor_hours_range": "22-34 h/m2",
+      "time_range": "14-20 weeks",
+      "cost_per_m2_range": "950-1350 EUR/m2",
+      "source_label": "Hispalyt GlobalEPD 008-016/017/001 + BEDEC ITeC + CYPE FEF010/FFZ010 (Tier 1, Catalonia)",
+      "geographic_tier": "Catalan tier-1",
+      "data_model": "phase_based",
+      "display_mode": "construction_phase_view",
+      "stages": ["foundation", "structure", "roof", "openings", "finishing"],
+      "selected_material_default": "fired_clay_brick",
+      "confidence_range": {
+        "level": "high",
+        "score_low": 0.85,
+        "score_high": 0.95,
+        "note": "Dominant Tier-1 Catalan EPDs. No major geographic extrapolation needed."
+      },
+      "revenue_estimate": null,
+      "profit_estimate": null,
+      "data_csv": "data/imports/treethreetree/masonry.csv"
+    },
+    {
+      "id": 2,
+      "name": "3D PRINTED",
+      "rfid_tag": "E5F6A7B8",
+      "color_rgb": [0.18, 0.62, 0.85],
+      "min_pucks": 2,
+      "max_pucks": 10,
+      "description": "Robotic concrete extrusion. Structural walls only. Foundation, roof, and openings remain conventional. No published Catalan peer-reviewed LCA was found in the imported dataset.",
+      "co2_per_m2_range": "58-147 kgCO2e/m2 GFA",
+      "co2_structure_only_range": "44-90 kgCO2e/m2 wall",
+      "labor_hours_range": "8-16 h/m2",
+      "time_range": "6-10 weeks",
+      "cost_per_m2_range": "1000-1500 EUR/m2",
+      "source_label": "Mohammad 2020 + Rossi 2024 + Allouzi 2020. No Catalan peer-reviewed 3DP LCA in the imported branch.",
+      "geographic_tier": "global (no Catalan primary data)",
+      "data_model": "phase_based",
+      "display_mode": "construction_phase_view",
+      "stages": ["foundation", "structure", "roof", "openings", "finishing"],
+      "selected_material_default": "printed_concrete_or_earth_proxy",
+      "confidence_range": {
+        "level": "medium-low",
+        "score_low": 0.4,
+        "score_high": 0.6,
+        "note": "Tier-1 sources exist, but all require geographic extrapolation to Catalonia."
+      },
+      "revenue_estimate": null,
+      "profit_estimate": null,
+      "data_csv": "data/imports/treethreetree/3d-printed.csv"
+    },
+    {
+      "id": 3,
+      "name": "PREFAB",
+      "rfid_tag": "C9D0E1F2",
+      "color_rgb": [0.25, 0.72, 0.45],
+      "min_pucks": 2,
+      "max_pucks": 10,
+      "description": "Factory-built modules or CLT panel systems assembled on site. Imported dataset is lifecycle-stage based rather than the project's five construction phases, so it is not yet engine-ready.",
+      "co2_per_m2_range": "130-350 kgCO2e/m2 GFA",
+      "co2_note": "Range spans CLT with biogenic credit, CLT without biogenic credit, and modular-concrete references.",
+      "labor_hours_range": "12-20 h/m2",
+      "time_range": "8-12 weeks",
+      "cost_per_m2_range": "1100-1600 EUR/m2",
+      "source_label": "Andersen 2022 + Wei 2024 + Stora Enso EPD. No Spanish/Catalan primary prefab LCA in the imported branch.",
+      "geographic_tier": "EU / global proxy",
+      "data_model": "lifecycle_based",
+      "display_mode": "prefab_lifecycle_card",
+      "stages": ["A1-A3", "A4", "A5", "B", "C"],
+      "sub_methods": ["clt", "modular_concrete"],
+      "default_sub_method": "clt",
+      "selected_material_defaults": {
+        "clt": "timber_clt_prefab",
+        "modular_concrete": "modular_concrete_prefab"
+      },
+      "confidence_range": {
+        "level": "medium",
+        "score_low": 0.55,
+        "score_high": 0.72,
+        "note": "Useful evidence exists, but the imported dataset still needs phase mapping and transport normalization for the project engine."
+      },
+      "revenue_estimate": null,
+      "profit_estimate": null,
+      "data_csv": "data/imports/treethreetree/prefab.csv"
+    },
+    {
+      "id": 4,
+      "name": "RECLAIMED BRICK",
+      "rfid_tag": "A3B4C5D6",
+      "color_rgb": [0.72, 0.3, 0.22],
+      "min_pucks": 2,
+      "max_pucks": 10,
+      "description": "Salvaged fired-clay brick, cleaned and relaid. Imported as a baseline floor rather than a fully comparable fourth competitor. The allocation rule can swing the structure CO2 result by roughly 5x.",
+      "co2_per_m2_range": "8-25 kgCO2e/m2 (cut-off) | 18-45 (avoided-burden) | 35-70 (system-expansion)",
+      "co2_default_range": "8-25 kgCO2e/m2 GFA",
+      "co2_note": "Structure-focused baseline. Foundation and roof remain conventional in the imported dataset.",
+      "labor_hours_range": "2.5-6.5 h/m2 wall",
+      "time_range": "2-5 weeks (structure only)",
+      "cost_per_m2_range": "95-220 EUR/m2 wall",
+      "source_label": "RBC EPD 2024 + Salmio and Huuhka 2026 + De Wolf 2020 + Devenes 2022. No Catalan primary reclaimed-brick LCA in the imported branch.",
+      "geographic_tier": "EU proxy",
+      "data_model": "overlay",
+      "display_mode": "construction_phase_view",
+      "stages": ["foundation", "structure", "roof", "openings", "finishing"],
+      "base_method": "masonry",
+      "selected_material_default": "reclaimed_fired_clay_brick",
+      "confidence_range": {
+        "level": "medium",
+        "score_low": 0.5,
+        "score_high": 0.68,
+        "note": "Strong methodology signal, but no Catalan primary data and very large sensitivity to allocation-rule choice."
+      },
+      "revenue_estimate": null,
+      "profit_estimate": null,
+      "data_csv": "data/imports/treethreetree/reclaimed-brick.csv",
+      "role": "BASELINE"
+    }
+  ],
+  "phases": [
+    {
+      "id": 1,
+      "name": "FOUNDATION",
+      "description": "Structural base. Reinforced concrete strip or slab. Load transfer to ground."
+    },
+    {
+      "id": 2,
+      "name": "STRUCTURE",
+      "description": "Load-bearing envelope or frame. Primary contributor to embodied carbon."
+    },
+    {
+      "id": 3,
+      "name": "ROOF",
+      "description": "Weatherproofing layer. Conventional in most imported branch scenarios."
+    },
+    {
+      "id": 4,
+      "name": "OPENINGS",
+      "description": "Windows and doors. Often conventional even when the structure method changes."
+    },
+    {
+      "id": 5,
+      "name": "FINISHING",
+      "description": "Interior and exterior surfaces such as render, plaster, paint, and tile."
+    }
+  ],
+  "comparison_insight": "The imported branch data is strongest when it exposes trade-offs and confidence, not when it pretends to offer one final winner. Masonry is best anchored in Catalan source material. 3D printing and prefab rely more heavily on external proxies. Reclaimed brick is useful as a methodological baseline, especially because its result changes dramatically with the allocation rule."
+}
