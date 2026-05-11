@@ -89,23 +89,33 @@ def cook(scriptOp):
         hb_alive = 0
 
     # ── Puck positions (sketch footprint points) ──────────────────────────────
-    # Vision2 sends /puck/N (i f f) — frame, x, y.
-    # TD names multi-arg OSC channels in different ways depending on version:
-    #   - 'puck/N:0', 'puck/N:1', 'puck/N:2'  (colon, 0-based)
-    #   - 'puck/N0',  'puck/N1',  'puck/N2'   (no colon, 0-based)
-    #   - 'puck/N1',  'puck/N2',  'puck/N3'   (no colon, 1-based — confirmed for Leo's TD)
-    # Try them all and pick the first that resolves.
-    def _puck_arg(pid: int, arg_idx: int):
-        for name in (
-            f'puck/{pid}:{arg_idx}',
-            f'puck/{pid}{arg_idx}',
-            f'puck/{pid}{arg_idx + 1}',
-        ):
+    # Detect the OSC channel naming convention ONCE — trying variants per-arg
+    # caused collisions (arg 1 stealing arg 0's channel).
+    _naming = 'colon'
+    try:
+        vision['puck/0:0']
+    except Exception:
+        try:
+            vision['puck/00']
+            _naming = 'flat0'
+        except Exception:
             try:
-                return vision[name][0]
+                vision['puck/01']
+                _naming = 'flat1'
             except Exception:
-                pass
-        return None
+                _naming = 'colon'
+
+    def _puck_arg(pid: int, arg_idx: int):
+        if _naming == 'colon':
+            name = f'puck/{pid}:{arg_idx}'
+        elif _naming == 'flat0':
+            name = f'puck/{pid}{arg_idx}'
+        else:  # flat1
+            name = f'puck/{pid}{arg_idx + 1}'
+        try:
+            return vision[name][0]
+        except Exception:
+            return None
 
     pucks: dict[int, tuple[float, float]] = {}
     for pid in FOOTPRINT_IDS:

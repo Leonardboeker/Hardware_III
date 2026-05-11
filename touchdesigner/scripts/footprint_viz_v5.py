@@ -88,8 +88,24 @@ LIVENESS_FRAMES = 10
 def cook(scriptOp):
     vision = op('vision_in')
 
-    # TD names multi-arg OSC channels in 3 different conventions depending on
-    # version / OSC In CHOP settings. Helper tries all three.
+    # Detect which channel-name convention this TD uses ONCE per cook,
+    # then read all puck args consistently. Trying variants per-arg led
+    # to collisions (arg 1 stealing arg 0's channel).
+    naming = 'colon'  # default
+    if vision is not None:
+        try:
+            vision['puck/0:0']
+        except Exception:
+            try:
+                vision['puck/00']
+                naming = 'flat0'
+            except Exception:
+                try:
+                    vision['puck/01']
+                    naming = 'flat1'
+                except Exception:
+                    naming = 'colon'  # nothing found; stick with default
+
     def _ch(name):
         if vision is None:
             return None
@@ -101,12 +117,16 @@ def cook(scriptOp):
         return None
 
     def _puck_arg(pid, arg_idx):
-        for n in (f'puck/{pid}:{arg_idx}', f'puck/{pid}{arg_idx}', f'puck/{pid}{arg_idx + 1}'):
-            try:
-                return vision[n][0]
-            except Exception:
-                pass
-        return None
+        if naming == 'colon':
+            name = f'puck/{pid}:{arg_idx}'
+        elif naming == 'flat0':
+            name = f'puck/{pid}{arg_idx}'
+        else:  # flat1
+            name = f'puck/{pid}{arg_idx + 1}'
+        try:
+            return vision[name][0]
+        except Exception:
+            return None
 
     # heartbeat
     hb_raw = _ch('vision/heartbeat')
