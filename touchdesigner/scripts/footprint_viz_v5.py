@@ -1,18 +1,29 @@
 """Panel layout renderer — Script TOP.
 
-Renders the 9-panel UI defined in the design spec (Panel_Ui.pdf), scaled from
-1920×1080 to 1280×720 for the TD Non-Commercial resolution limit (scale = 2/3).
+Renders the 9-panel UI from Panel_Ui.pdf at 1280×720 (TD Non-Commercial limit).
 
-Each panel is drawn as a bordered rectangle. Two panels carry live content:
-  - panel_main_plan_simulation : footprint geometry (pucks + polygon)
-  - panel_method_selection      : current construction method color
+This script does EVERYTHING in one node:
+  - Panel frames (all 9 panels with borders)
+  - Footprint geometry inside panel_main_plan_simulation
+  - Method color block inside panel_method_selection
+  - Heartbeat indicator in bar_bottom_status
+  - AUTO-BLIT any Text TOP named text_<panel_id> into its panel position
 
-Text content for the other panels comes from separate Text TOPs composed on
-top of this image — see TD-FRAMEWORK-GUIDE.md for the network layout.
+So to add text in any panel: create a Text TOP, rename to text_<panel_id>,
+set resolution to match the panel size (see PANELS dict below), and write
+your text content. This script picks it up automatically — no compose_final,
+no transform math, no over chain.
+
+Wire-up of the network:
+  render_footprint (this script TOP)  →  projector_out
+
+That's it. No compose_final needed.
 
 Reads from these TD nodes (must exist with these names):
-  vision_in        OSC In CHOP   — puck positions from CV pipeline
+  vision_in        OSC In CHOP   — puck data from CV pipeline
   compute_state    Script CHOP   — method_id channel (optional)
+  text_<panel_id>  Text TOP      — optional per-panel text overlay
+                                   e.g. text_method_selection
 """
 import math
 import numpy as np
@@ -46,20 +57,12 @@ C_BG          = (0.04, 0.04, 0.05, 1.0)
 C_PANEL_BG    = (0.08, 0.08, 0.10, 1.0)
 C_PANEL_EDGE  = (0.25, 0.25, 0.28, 1.0)
 C_LINE        = (1.0,  1.0,  1.0,  0.85)
-C_PUCK_RING   = (1.0,  1.0,  1.0,  1.0)
 
 METHOD_COLORS = {
     0: (0.40, 0.40, 0.40),   # NONE        — grey
     1: (0.85, 0.40, 0.20),   # MASONRY     — terracotta
     2: (0.10, 0.70, 0.90),   # 3D PRINTED  — cyan
     3: (0.95, 0.75, 0.00),   # PREFAB      — yellow
-}
-
-METHOD_NAMES = {
-    0: "NO METHOD",
-    1: "MASONRY",
-    2: "3D PRINTED",
-    3: "PREFAB",
 }
 
 FOOTPRINT_IDS   = list(range(10))
@@ -97,80 +100,128 @@ def cook(scriptOp):
         method_id = int(op('compute_state')['method_id'][0])
     except Exception:
         pass
-
     mc = METHOD_COLORS.get(method_id, METHOD_COLORS[0])
 
     # ----- render -----
     img = np.zeros((PROJ_H, PROJ_W, 4), dtype=np.float32)
     img[:, :] = C_BG
 
-    # draw all panel frames
+    # panel frames
     for pid, bounds in PANELS.items():
         _draw_panel_frame(img, *bounds, fill=C_PANEL_BG, edge=C_PANEL_EDGE, edge_w=2)
 
-    # content into specific panels
+    # interactive content into specific panels
     _draw_main_plan(img, pucks, mc)
-    _draw_method_selection(img, method_id, mc, hb)
+    _draw_method_color_block(img, mc, hb)
     _draw_heartbeat_dot(img, hb)
 
+    # AUTO-BLIT text overlays from named Text TOPs
+    _blit_text_overlays(img)
+
     scriptOp.copyNumpyArray(img)
+
+
+# ---------------------------------------------------------------------------
+# Auto text overlay
+# ---------------------------------------------------------------------------
+def _blit_text_overlays(img):
+    """For each panel, look for op('text_<panel_id>') and composite it in.
+
+    The Text TOP can be any resolution — we resample (nearest-neighbor) to
+    match the panel size if needed.
+    """
+    for panel_id, bounds in PANELS.items():
+        text_op = op(f'text_{panel_id}')
+        if text_op is None:
+            continue
+        try:
+            tex = text_op.numpyArray(delayed=False)
+        except Exception:
+            continue
+        if tex is None:
+            continue
+        # TD numpy arrays have origin bottom-left; we use top-left → flip Y
+        tex = np.flipud(tex)
+        # ensure 4 channels
+        if tex.shape[-1] == 3:
+            alpha = np.ones((*tex.shape[:2], 1), dtype=tex.dtype)
+            tex = np.concatenate([tex, alpha], axis=-1)
+        # match dtype
+        if tex.dtype != np.float32:
+            tex = tex.astype(np.float32)
+            if tex.max() > 1.5:
+                tex = tex / 255.0
+        bx, by, bw, bh = bounds
+        _blit_alpha(img, tex, bx, by, bw, bh)
+
+
+def _blit_alpha(img, src, x, y, w, h):
+    """Alpha-composite src into img at (x, y) with size (w, h).
+    Resamples src to (h, w) with nearest-neighbor if shape doesn't match."""
+    img_h, img_w = img.shape[:2]
+    x1 = min(x + w, img_w)
+    y1 = min(y + h, img_h)
+    if x1 <= x or y1 <= y:
+        return
+    target_h = y1 - y
+    target_w = x1 - x
+    if src.shape[0] != target_h or src.shape[1] != target_w:
+        ys = (np.arange(target_h) * src.shape[0] / target_h).astype(int)
+        xs = (np.arange(target_w) * src.shape[1] / target_w).astype(int)
+        src = src[ys][:, xs]
+    a = src[..., 3:4]
+    img[y:y1, x:x1, :3] = src[..., :3] * a + img[y:y1, x:x1, :3] * (1 - a)
+    img[y:y1, x:x1, 3:4] = np.maximum(img[y:y1, x:x1, 3:4], a)
 
 
 # ---------------------------------------------------------------------------
 # Panel content
 # ---------------------------------------------------------------------------
 def _draw_main_plan(img, pucks, method_color):
-    """Footprint geometry inside panel_main_plan_simulation."""
     bx, by, bw, bh = PANELS['main_plan_simulation']
-
     if not pucks:
         return
-
     pts = [_remap_to_panel(*pos, bx, by, bw, bh) for pos in pucks.values()]
-
     if len(pts) >= 3:
         cx = sum(p[0] for p in pts) / len(pts)
         cy = sum(p[1] for p in pts) / len(pts)
         pts_sorted = sorted(pts, key=lambda p: math.atan2(p[1] - cy, p[0] - cx))
-
         _fill_polygon(img, pts_sorted, (*method_color, 0.18), (bx, by, bx + bw, by + bh))
-
         for i in range(len(pts_sorted)):
             p1 = pts_sorted[i]
             p2 = pts_sorted[(i + 1) % len(pts_sorted)]
             _line(img, *p1, *p2, (*method_color, 0.9), 2)
-
     elif len(pts) == 2:
         _line(img, *pts[0], *pts[1], C_LINE, 2)
-
     for pt in pts:
         _circle(img, *pt, 8, (*method_color, 1.0), 3)
 
 
-def _draw_method_selection(img, method_id, method_color, hb):
-    """Method color band inside panel_method_selection."""
+def _draw_method_color_block(img, method_color, hb):
+    """Color block on the LEFT side of method_selection panel.
+    Right side is left empty so text_method_selection can show there."""
     bx, by, bw, bh = PANELS['method_selection']
     pad = 14
-
-    # left part: method color block
-    block_w = int(bh * 1.4)  # roughly square area on the left
-    alpha = 0.9 if hb >= 0 else 0.3
-    img[by + pad : by + bh - pad, bx + pad : bx + pad + block_w] = (*method_color, alpha)
-
-    # right part of panel left empty — Text TOP will write the method name here
+    block_w = bh - pad * 2  # square-ish
+    alpha = 1.0 if hb >= 0 else 0.3
+    src = np.zeros((bh - 2 * pad, block_w, 4), dtype=np.float32)
+    src[..., 0] = method_color[0]
+    src[..., 1] = method_color[1]
+    src[..., 2] = method_color[2]
+    src[..., 3] = alpha
+    _blit_alpha(img, src, bx + pad, by + pad, block_w, bh - 2 * pad)
 
 
 def _draw_heartbeat_dot(img, hb):
-    """Small alive/offline indicator inside the bottom status bar."""
     bx, by, bw, bh = PANELS['bar_bottom_status']
     cy = by + bh // 2
     cx = bx + 16
     color = (0.0, 0.9, 0.3, 1.0) if hb >= 0 else (0.85, 0.15, 0.15, 1.0)
-    _circle(img, cx, cy, 6, color, width=10)  # filled-ish dot
+    _circle(img, cx, cy, 6, color, width=10)
 
 
 # ---------------------------------------------------------------------------
-# Panel frame
+# Frames + geometry
 # ---------------------------------------------------------------------------
 def _draw_panel_frame(img, x, y, w, h, fill, edge, edge_w):
     h_img, w_img = img.shape[:2]
@@ -179,20 +230,13 @@ def _draw_panel_frame(img, x, y, w, h, fill, edge, edge_w):
     if x1 <= x or y1 <= y:
         return
     img[y:y1, x:x1] = fill
-    # top + bottom edges
     img[y : y + edge_w,        x:x1] = edge
     img[y1 - edge_w : y1,      x:x1] = edge
-    # left + right edges
     img[y:y1, x : x + edge_w]        = edge
     img[y:y1, x1 - edge_w : x1]      = edge
 
 
-# ---------------------------------------------------------------------------
-# Geometry helpers
-# ---------------------------------------------------------------------------
 def _remap_to_panel(px, py, bx, by, bw, bh):
-    """Map projector-space puck (px,py) into the given panel rectangle.
-    Assumes the CV pipeline outputs coords in 0..PROJ_W, 0..PROJ_H space."""
     x = bx + (px / PROJ_W) * bw
     y = by + (py / PROJ_H) * bh
     return x, y
