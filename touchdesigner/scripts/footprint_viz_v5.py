@@ -140,7 +140,9 @@ def cook(scriptOp):
     if hb_alive == 0:
         _draw_disconnected(img)
 
-    scriptOp.copyNumpyArray(img)
+    # TD's TOPs use bottom-left origin while our drawing uses top-left.
+    # Flip vertically once at the end so the layout reads right-side-up.
+    scriptOp.copyNumpyArray(np.flipud(img).copy())
 
 
 # ---------------------------------------------------------------------------
