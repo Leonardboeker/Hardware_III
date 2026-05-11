@@ -11,12 +11,24 @@ LCA datasets and any structured data the runtime reads.
 ## Schema
 
 CSV remains the preferred format because it diffs cleanly and can be read by the
-TouchDesigner metrics engine without extra dependencies.
+standalone metrics pipeline without extra dependencies.
 
-The metrics engine expects `data/methods/*.csv` files with this exact header:
+Raw imported files live under:
 
 ```text
-phase,parameter,value_low,value_high,unit,assumption,source,source_tier
+data/imports/treethreetree/
+```
+
+Normalized engine-safe files live under:
+
+```text
+data/methods/
+```
+
+The normalized pipeline uses this unified header:
+
+```text
+method,data_model,display_mode,phase,lifecycle_stage,sub_method,metric,value_low,value_high,unit,basis,source_key,confidence_min,confidence_max,selected_material,notes,metadata
 ```
 
 Field rules:
@@ -52,7 +64,10 @@ equivalents.csv
 
 Missing values should be explicit, not silent.
 
-If a row is not ready yet, still include it with:
+If a row is not ready yet, still include it with `null` in normalized data or
+the raw import placeholders in `data/imports/treethreetree/`.
+
+Raw-import placeholders may still use:
 
 ```text
 value_low=UNKNOWN
@@ -68,6 +83,16 @@ instead of faking precision.
 
 The metrics engine ignores lines beginning with `#`.
 This is useful for method-level notes such as the reclaimed-brick baseline note.
+
+## Standalone pipeline
+
+The current normalization and engine code is intentionally separate from
+TouchDesigner:
+
+```text
+metrics/pipeline.py
+data/normalization_rules.json
+```
 
 ## Sourcing rule
 

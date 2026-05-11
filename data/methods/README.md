@@ -1,6 +1,6 @@
 # data/methods/
 
-Drop the per-method metrics CSV files here.
+This folder now stores the normalized, engine-safe metrics datasets.
 
 Expected filenames:
 - `masonry.csv`
@@ -8,12 +8,26 @@ Expected filenames:
 - `prefab.csv`
 - `reclaimed-brick.csv`
 
-Required header for every file:
+Unified normalized header:
 
 ```text
-phase,parameter,value_low,value_high,unit,assumption,source,source_tier
+method,data_model,display_mode,phase,lifecycle_stage,sub_method,metric,value_low,value_high,unit,basis,source_key,confidence_min,confidence_max,selected_material,notes,metadata
 ```
 
-The metrics engine starter at
-[metrics_engine.py](/o:/Hardware_III/touchdesigner/scripts/metrics_engine.py)
-reads this folder directly.
+Model notes:
+- `masonry` and `3d-printed` are `phase_based`
+- `prefab` is `lifecycle_based`
+- `reclaimed-brick` is `overlay`
+
+Do not edit raw imported CSVs here.
+Those stay under:
+
+```text
+data/imports/treethreetree/
+```
+
+The standalone normalization and engine pipeline lives in:
+
+```text
+metrics/pipeline.py
+```
