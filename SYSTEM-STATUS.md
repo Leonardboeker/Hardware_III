@@ -1,27 +1,50 @@
 # System Status — Hardware III
 
-**Last update:** 2026-05-11
+**Last update:** 2026-05-11 (post team-merge)
 **Branch:** `master` (single source of truth)
 
-This document is the **team handoff snapshot** — what works, what doesn't,
-where each role plugs in. Read this before starting any new work on the project.
+This is the **team handoff snapshot** — what works, what doesn't, where each role
+plugs in. Read this before starting any new work.
 
 ---
 
-## 1. Current Architecture (high-level)
+## ⚠️ Recently landed from team — read this first
+
+In the last few days the team pushed several large updates that converged on
+Onur's metric-engine vision:
+
+| What | Owner | Where |
+|------|-------|-------|
+| Full LCA data per method (CO₂, labour, time, cost — sourced ranges) | Rafik | `data/methods_db.json` + `data/methods/*.csv` |
+| Source registry (45+ citations) | Rafik | `data/SOURCES.md` |
+| Normalization rules (shape factor, units) | Rafik | `data/normalization_rules.json` |
+| Metrics engine gaps doc | Rafik | `data/METRICS_ENGINE_GAPS.md` |
+| Reclaimed brick reintroduced as **baseline** (not 4th competitor) | Rafik | `methods_db.json` id=4 |
+| HSV-red-blob puck tracker (replaces ArUco) | Vision team | `vision/puck_detector.py` |
+| Top-level vision app with gesture/calibration support | Vision team | `vision/main.py`, `vision/gestures.py`, `vision/calibrate.py` |
+| Onur metric-engine merge | Onur | `4ce6d42 merge(Onur): metrics engine + UI prototype + data pipeline` |
+
+**Implications for what we built earlier:**
+- Methods are now 4 (3 competitive + 1 baseline) — see Section 7 below
+- LCA data is **in** the JSON, not a future task
+- There are now **two vision approaches** in the repo (ArUco vertical-slice
+  vs HSV-red puck tracker) — see Section 8
+
+---
+
+## 1. Architecture
 
 ```
 ┌─────────────────┐     ┌──────────────────┐     ┌──────────────────┐
-│  Camera (USB)   │     │  ESP32 + RC522   │     │   Methods DB     │
-│  + ArUco markers│     │  (RFID reader)   │     │  methods_db.json │
+│  Camera (USB)   │     │  ESP32 + RC522   │     │  methods_db.json │
+│  ArUco OR HSV   │     │  (RFID reader)   │     │  + methods/*.csv │
 └────────┬────────┘     └────────┬─────────┘     └────────┬─────────┘
-         │ OpenCV                │ USB Serial             │ static file
-         │ (Python)              │ 115200 baud            │
+         │ OSC (Python)          │ USB Serial             │ static
          ▼                       ▼                        ▼
    ┌──────────────────────────────────────────────────────────┐
    │                      TouchDesigner                       │
    │                                                          │
-   │  vision_in (OSC In CHOP)   rfid_in (Serial DAT)         │
+   │  vision_in (OSC In CHOP)   rfid_in (Constant or Serial) │
    │              │                       │                   │
    │              └──────────┬────────────┘                   │
    │                         ▼                                │
@@ -37,235 +60,239 @@ where each role plugs in. Read this before starting any new work on the project.
    │                         ▼                                │
    │                  projector_out (Window COMP)             │
    └──────────────────────────────────────────────────────────┘
-                            │
-                            ▼
-                       Projector → Table surface
 ```
 
 ---
 
 ## 2. Subsystem Status
 
-| Subsystem | Status | Owner | Where it lives |
-|-----------|--------|-------|----------------|
-| Vision pipeline (Python+OpenCV+ArUco) | ✅ Working | Leo | `vision/src/` |
-| OSC bridge (Python → TD) | ✅ Working | Leo | `vision/src/osc_send.py` |
-| TouchDesigner 9-panel UI frame | ✅ Working | Leo | `touchdesigner/scripts/footprint_viz_v5.py` |
-| TD state aggregation (CHOP) | ✅ Working | Leo | `touchdesigner/scripts/state_chop_v1.py` |
-| TD text panel auto-blit | ✅ Working | Leo | (in `footprint_viz_v5.py`) |
-| TD method selection display | ✅ Working | Leo | `text_method_selection` Text TOP |
-| ESP32 RC522 firmware | 🟡 Sketch written, hardware test in progress | Leo | `firmware/esp32-rfid/esp32_rfid.ino` |
-| ESP32 hardware (PCB + tags) | 🟡 In lab — RFID detection not working yet | Leo | physical |
-| Methods DB structure | ✅ 3 methods locked (no reclaimed) | Leo | `data/methods_db.json` |
-| LCA data ingestion | ❌ Not started — values in research_2/*/VALUES.md not yet in DB | Data team | `docs/research_2/` |
-| Phase navigation FSM in TD | ❌ Not started | TBD | TD spec exists in `.planning/FSM_TOUCHDESIGNER_SPEC.md` |
-| Construction phase visuals | ❌ Not started | TBD | needs per-phase rendering |
-| Comparison view (final) | ❌ Not started | TBD | spec in proposal |
-| Sound layer | ❌ Not started | Sound team | — |
-| Calibration (real camera) | ❌ Synthetic placeholder only | Leo | `vision/calibration/` |
+| Subsystem | Status | Owner |
+|-----------|--------|-------|
+| TD 9-panel UI frame + auto text blit | ✅ Working | Leo |
+| TD state aggregation (`compute_state`) | ✅ Working | Leo |
+| TD method-selection display | ✅ Working | Leo |
+| Vision: ArUco vertical-slice (`vision/src/`) | ✅ Working (synthetic calib) | Leo |
+| Vision: HSV red puck tracker (`vision/puck_detector.py`) | ✅ Functional (new) | Vision team |
+| OSC bridge (Python → TD) | ✅ Working | Leo (& vision team) |
+| **LCA data per method (sourced ranges + confidence)** | ✅ **In place** | Rafik |
+| **Source registry (45+ citations)** | ✅ Done | Rafik |
+| Methods DB structure (4 methods + shape factor + phases) | ✅ Done | Rafik |
+| ESP32 RC522 sketch + lab guide | ✅ Written, hardware test in progress | Leo |
+| ESP32 hardware (RFID detection) | 🟡 **Blocker — RC522 not reading tags yet** | Leo (in lab) |
+| Phase navigation FSM in TD | ❌ Not started | TBD |
+| Per-phase visualisation logic | ❌ Not started | TBD |
+| Comparison view (final state) | ❌ Not started | TBD |
+| Sound layer | ❌ Not started | Sound team |
+| Real camera calibration (replace synthetic) | ❌ Not started | Leo |
+| Prefab lifecycle UI (per Onur metric_engine_ui_update) | ❌ Open question — see Section 7 | — |
 
 Legend: ✅ done · 🟡 in progress · ❌ not started
 
 ---
 
-## 3. What's on the screen right now (verified working)
+## 3. What works right now
 
-Open `vertical-slice.toe` in TouchDesigner 2025.32050. The `projector_out`
-window shows a 1280×720 image with:
+Open `vertical-slice.toe` in TouchDesigner 2025.32050 — `projector_out` shows
+a 1280×720 image with:
 
-- **9 bordered panels** in the layout from `reference/Panel_Ui.pdf`
-- **`panel_method_selection`** (bottom-middle): color block + method name auto-update with `rfid_in`
-- **`panel_main_plan_simulation`** (center): puck positions + polygon when vision pipeline is running
-- **`bar_bottom_status`** (bottom): heartbeat dot (green = vision live, red = offline)
+- 9 bordered panels (from `reference/Panel_Ui.pdf`, scaled from 1920×1080)
+- `panel_method_selection` (bottom-middle): color block + name auto-update with `rfid_in`
+- `panel_main_plan_simulation` (center): puck positions + polygon when vision is running
+- `bar_bottom_status`: heartbeat dot (green = vision live)
 
-To test:
+Test without ArUco / RFID hardware:
 ```bash
-# vision pipeline
-python -m vision.src.run_vertical_slice \
-  --camera 0 \
+python -m vision.src.run_vertical_slice --camera 0 \
   --intrinsics vision/calibration/synthetic_intrinsics.yml \
   --homography vision/calibration/synthetic_homography.yml
 ```
+Or new HSV-puck path (no markers needed):
+```bash
+python vision/main.py  # check vision/README.md for current usage
+```
 
-In TD: change `rfid_in` Channel 0 Value (0–3) → method color + name switches live.
-
----
-
-## 4. TouchDesigner Network — Node Reference
-
-| Node | Type | Role | Reads from |
-|------|------|------|-----------|
-| `vision_in` | OSC In CHOP | Puck positions from CV pipeline | UDP port 7000 |
-| `rfid_in` | Constant CHOP (stub) → Serial DAT (real) | Construction method selector | ESP32 USB serial |
-| `compute_state` | Script CHOP | Aggregates puck_count, area_px2, method_id, hb_alive | vision_in, rfid_in |
-| `render_footprint` | Script TOP (1280×720) | Renders all 9 panels + auto-blits text TOPs | vision_in, compute_state, text_* TOPs |
-| `text_method_selection` | Text TOP | Current method name (and any other `text_<panel_id>` TOPs you add) | compute_state |
-| `projector_out` | Window COMP | Output to projector | `Window Operator = render_footprint` |
-
-Old nodes removed (do not recreate): `compose_final`, `stats_text` (the old strip-style one), `switch1`, `select1`, `storage`, `script3`, all `disconnected`/`pending`/`invalid`/`valid` color blocks.
+Change `rfid_in` Channel 0 Value (0–4) in TD → method color + name switches live.
 
 ---
 
-## 5. How to add content to a text panel
+## 4. TouchDesigner Network Reference
 
-The Script TOP auto-discovers Text TOPs by name. So:
+| Node | Type | Role |
+|------|------|------|
+| `vision_in` | OSC In CHOP, port 7000 | Puck positions from CV pipeline |
+| `rfid_in` | Constant CHOP (stub) → Serial DAT (real) | Method selector |
+| `compute_state` | Script CHOP | `puck_count`, `area_px2`, `method_id`, `hb_alive` |
+| `render_footprint` | Script TOP (1280×720) | All 9 panels + auto-blits `text_<panel_id>` TOPs |
+| `text_method_selection` | Text TOP | Method name (and any other `text_<panel>` you add) |
+| `projector_out` | Window COMP | Output (`Window Operator = render_footprint`) |
+
+Removed (don't recreate): `compose_final`, old `stats_text`, `switch1`, `select1`, `storage`, `script3`, all FSM colour blocks.
+
+---
+
+## 5. Adding content to a text panel
+
+The Script TOP auto-discovers Text TOPs by name. Workflow:
 
 1. Add a Text TOP, rename to `text_<panel_id>` (e.g. `text_right_comparison`)
-2. Set Resolution to panel size from the table in `touchdesigner/PANEL-LAYOUT-GUIDE.md`
-3. Write Text content (literal string or Python expression)
-4. **Don't wire it to anything** — `render_footprint` picks it up automatically
+2. Set Resolution to the panel size (table in `touchdesigner/PANEL-LAYOUT-GUIDE.md`)
+3. Write text (literal or Python expression)
+4. **Don't wire it** — `render_footprint` picks it up automatically
 
-No more compose_final, no more Over TOPs, no more Translate math.
+No `compose_final`, no Over chain, no Translate math.
 
 ---
 
 ## 6. Current Blocker — ESP32 RFID hardware
 
-The ESP32 sketch (`firmware/esp32-rfid/esp32_rfid.ino`) is flashed and the
-heartbeat is streaming over USB serial, but **the RC522 module is not detecting
-MIFARE tags**. Diagnostic in progress:
-- Sending heartbeat (`HB:N` lines) → ESP32 firmware is running
-- No `RFID:XXXXXXXX` lines appear when tags are placed on the reader
-- Next step: load the MFRC522 library's built-in `DumpInfo` example to isolate
-  whether it's our code or the hardware
+The ESP32 sketch is flashed and the heartbeat is streaming. But **the RC522 is
+not detecting MIFARE tags**.
 
-See `firmware/esp32-rfid/LAB-SETUP-GUIDE.md` for the full wiring/setup/debug
-walkthrough.
+- Firmware OK: `HB:N` lines visible in serial monitor → ESP32 alive
+- No `RFID:XXXXXXXX` lines on tag scans
+- Next step: load MFRC522 library's `DumpInfo` example to isolate hardware vs code
 
-**Workaround until RFID is solved:** `rfid_in` runs as a Constant CHOP. Change
-Channel 0 Value (0/1/2/3) manually to switch the construction method.
+Walk-through: `firmware/esp32-rfid/LAB-SETUP-GUIDE.md`
+
+Workaround for now: `rfid_in` runs as a Constant CHOP. Change Channel 0 Value
+(0/1/2/3/4) manually to switch the construction method.
 
 ---
 
-## 7. Open Architecture Decisions
+## 7. Methods — current canonical list
 
-These contradict between team docs and need to be resolved before further work:
+| id | Name | Role | RFID Tag | data CSV |
+|----|------|------|----------|----------|
+| 0 | NONE | Empty / no selection | — | — |
+| 1 | MASONRY | Competitive method | `A1B2C3D4` (PLACEHOLDER) | `data/methods/masonry.csv` |
+| 2 | 3D PRINTED | Competitive method | `E5F6A7B8` (PLACEHOLDER) | `data/methods/3d-printed.csv` |
+| 3 | PREFAB | Competitive method (CLT + modular concrete sub-methods) | `C9D0E1F2` (PLACEHOLDER) | `data/methods/prefab.csv` |
+| 4 | RECLAIMED BRICK | **Baseline / floor** — not a 4th competitor | `A3B4C5D6` (PLACEHOLDER) | `data/methods/reclaimed-brick.csv` |
 
-### 7.1 — Prefab lifecycle vs construction phases
-- **Onur's `metric_engine_ui_update.md`** says Prefab uses `lifecycle_based`
-  data model (A1-A3, A4, A5, B, C) and a different UI panel.
-- **`.planning/FSM_TOUCHDESIGNER_SPEC.md`** says all methods walk through the
-  same 5 construction phases (Foundation → Finishing).
-- **Implication:** if Prefab gets a different UI, the user can't physically
-  walk through phases with pucks for Prefab. Breaks core UX.
-- **Pending decision:** force Prefab into phase-based with approximated data +
-  warning flag (recommended), OR build a parallel UI for it.
+Reclaimed brick was removed earlier ("ohne reclaimed", 2026-05-10) but Rafik's
+data team brought it back as **BASELINE** (against which other methods are
+plotted), not as a competitor. This is consistent with Onur's `metric_engine_ui_update.md`.
 
-### 7.2 — Reclaimed brick
-- Old docs: 4th method
-- New docs (Onur's update): overlay on Masonry
-- **Current code:** Reclaimed removed entirely (3 methods only). Leo's decision
-  on 2026-05-10.
+RFID tag UIDs above are placeholders — to be assigned after the ESP32 reader
+is working and the physical tags are mapped (see `serial_rfid_v1.py`).
 
-### 7.3 — Resolution
-- Design docs: 1920×1080
+---
+
+## 8. Open Architecture Decisions
+
+### 8.1 — Two vision approaches in the repo
+
+- `vision/src/run_vertical_slice.py` — **ArUco markers** (Leo, vertical slice)
+- `vision/main.py` + `puck_detector.py` — **HSV red blob tracking** (vision team, newer)
+
+Both write OSC to TD on `vision_in`. **Which is the demo path?** The team
+should pick one — likely HSV is simpler operationally (no printed markers) but
+ArUco is more robust to lighting. Currently both exist; the TD side reads
+whichever is running.
+
+### 8.2 — Prefab lifecycle UI vs phase-based UI
+
+- Onur's `metric_engine_ui_update.md` (recent): Prefab uses `lifecycle_based`
+  data model with a different panel (`panel_prefab_lifecycle_card`)
+- `.planning/FSM_TOUCHDESIGNER_SPEC.md`: all methods walk through the same 5 phases
+- **Current code:** single UI for all methods, prefab approximated into phases
+
+**Decision needed:** does Prefab get its own UI panel or stay in the unified
+5-phase flow? See `data/METRICS_ENGINE_GAPS.md` for the data-side implications.
+
+### 8.3 — Resolution
+
+- Design docs say 1920×1080
 - Current implementation: 1280×720 (TD Non-Commercial license limit)
-- **Pending:** apply for TD Educational license (free for students) to get back
-  to 1920×1080.
+- **Recommended action:** apply for TD Educational license (free for students
+  with academic email) → 1920×1080 unlocked, also removes watermark
 
 ---
 
-## 8. Per-Role Integration Points
+## 9. Per-Role Integration Points
 
-### For the Data team (LCA values)
-- Your data lives in `docs/research_2/<method>/VALUES.md`
-- The TD runtime reads `data/methods_db.json` — currently only has metadata
-- **What you need to do:** decide how to flow VALUES.md → methods_db.json
-  - Option A: hand-curate JSON entries per phase per method
-  - Option B: write a script that parses VALUES.md → JSON
-  - Either way, schema should be:
-    ```json
-    "lca": {
-      "foundation": {"co2_low": 70, "co2_high": 130, "unit": "kg CO2/m2"},
-      ...
-    }
-    ```
+### Data team (Rafik)
+- LCA data is already wired into `methods_db.json` with sourced ranges
+- Next: decide engine implementation (Python script reading CSVs, or TD-side Script DAT)
+- Resolve `METRICS_ENGINE_GAPS.md` — especially prefab lifecycle mapping
 
-### For the ESP32 / Sensor / Sound team
-- Current ESP32 protocol: USB serial `RFID:<HEX>\n` (see firmware spec)
-- TD reads it via Serial DAT. Mapping tag → method_id in
-  `touchdesigner/scripts/serial_rfid_v1.py`
-- **What you need to do:**
-  - Help debug current RC522 wiring issue (see `firmware/esp32-rfid/LAB-SETUP-GUIDE.md`)
-  - Once RFID is reading: write down tag UIDs, update the dictionary in `serial_rfid_v1.py`
-  - Plan: add proximity sensor next (HC-SR04 or PIR), define its OSC/serial protocol
+### Vision team
+- Two pipelines exist (`vision/src/` ArUco vs `vision/main.py` HSV). Pick one
+  for demo, document the choice in `vision/README.md`
+- Real camera calibration still needed (current YAMLs are synthetic placeholders)
 
-### For the FSM / Visuals team
-- Current state: only `panel_main_plan_simulation` and `panel_method_selection`
-  have content
-- **What's missing:**
-  - `text_top_phase_navigation` — current phase name
-  - `text_left_info` — phase-specific info text
-  - `text_right_comparison` — comparison table
-  - `text_right_cost_chart` — cost data + chart visualization
-  - `text_right_phase_preview` — checklist
-  - `text_bar_bottom_status` — live status line
-- **How to add them:** see `touchdesigner/PANEL-LAYOUT-GUIDE.md`, section
-  "How to add text to any panel"
-- **Phase logic:** needs a CHOP/DAT that holds the current phase index (0-4),
-  with logic to advance based on FSM state. See `.planning/FSM_TOUCHDESIGNER_SPEC.md`.
+### ESP32 / Sensor / Sound (Onur + team)
+- Help debug RC522 wiring (see `firmware/esp32-rfid/LAB-SETUP-GUIDE.md`)
+- Plan proximity sensor (HC-SR04 or PIR) + sound layer integration
+- Define OSC/serial protocols for any new sensor
 
-### For Fabrication / CAD
-- 3D printables and Rhino sources: `cad/` and `cad/rhino/`
-- ArUco markers already generated: `cad/aruco-markers/`
-- **What's missing:** physical puck design, method-selector models, table mock-up,
-  RFID reader enclosure. See `cad/README.md` for conventions.
+### FSM / Visuals team
+- 7 text panels still empty — see Section 5 to add content
+- Phase navigation logic: needs a CHOP/DAT holding current phase index (0-4)
+- Per-phase visual variations TBD
+
+### Fabrication / CAD
+- ArUco markers: `cad/aruco-markers/`
+- Still needed: physical puck design, method-selector models, RFID pedestal
+  enclosure, table mock-up
 
 ---
 
-## 9. Key Files — Source of Truth Order
+## 10. Source-of-Truth Order
 
-When older docs conflict with current implementation, prefer in this order:
+When older docs conflict with current code, prefer in this order:
 
 1. `touchdesigner/scripts/footprint_viz_v5.py` — actual TD rendering
 2. `touchdesigner/scripts/state_chop_v1.py` — actual state aggregation
-3. `vision/src/run_vertical_slice.py` — actual vision pipeline entry
-4. `firmware/esp32-rfid/esp32_rfid.ino` — actual ESP32 firmware
+3. `vision/src/run_vertical_slice.py` OR `vision/main.py` — actual vision (TBD which is canonical)
+4. `firmware/esp32-rfid/esp32_rfid.ino` — actual firmware
 5. `data/methods_db.json` — current method definitions
-6. `SYSTEM-STATUS.md` (this file)
-7. `INTERFACE_CONTRACT.md` — system-level subsystem boundaries
-8. `.planning/FSM_TOUCHDESIGNER_SPEC.md` — FSM canonical spec
-9. `.planning/PROJECT.md` — project context
+6. `data/SOURCES.md` — citation registry
+7. `SYSTEM-STATUS.md` (this file)
+8. `INTERFACE_CONTRACT.md` — subsystem boundaries
+9. `.planning/FSM_TOUCHDESIGNER_SPEC.md` — FSM canonical spec
+10. `data/METRICS_ENGINE_GAPS.md` — open data engineering questions
 
-Anything in `archive/` is historical and should not be treated as current.
+Anything in `archive/` is historical, not current.
 
 ---
 
-## 10. How to set up your dev environment
+## 11. Dev environment
 
 ```bash
-# Clone & checkout
 git clone https://github.com/Leonardboeker/Hardware_III.git
 cd Hardware_III
 
 # Python deps
 pip install opencv-contrib-python python-osc pyyaml numpy
 
-# TouchDesigner: install 2025.32050 (do not upgrade mid-project)
-#   Open vertical-slice.toe
+# TouchDesigner: install 2025.32050 (do NOT upgrade mid-project)
+# Open vertical-slice.toe
 
-# Arduino (only if working on ESP32)
-#   Install Arduino IDE 2.x
-#   Add ESP32 board support (v2.0.17 recommended for stability)
-#   Install MFRC522 library by GithubCommunity
+# Arduino (only for ESP32 work)
+# Install Arduino IDE 2.x + ESP32 board support v2.0.17 + MFRC522 library
 ```
 
-Run the vision-only test (no ESP32 needed):
+Quick test (vision only):
 ```bash
 python -m vision.src.run_vertical_slice --camera 0 \
   --intrinsics vision/calibration/synthetic_intrinsics.yml \
   --homography vision/calibration/synthetic_homography.yml
 ```
 
-In TD: open `vertical-slice.toe`, you should see the 9-panel layout in
-`projector_out`. Change `rfid_in` Channel 0 Value (0–3) to test method switching.
+Or the new HSV path:
+```bash
+python vision/main.py   # consult vision/README.md for current usage
+```
+
+In TD: open `vertical-slice.toe`, see 9-panel layout in `projector_out`.
 
 ---
 
-## 11. Where to ask questions
+## 12. Where to ask
 
-- **Branch hygiene / merging:** ask Leo, don't push to master without coordination
-- **TD internals:** see `touchdesigner/TD-FRAMEWORK-GUIDE.md` +
-  `touchdesigner/PANEL-LAYOUT-GUIDE.md`
-- **Hardware wiring:** see `firmware/esp32-rfid/LAB-SETUP-GUIDE.md`
-- **Architecture / interface contract:** see `INTERFACE_CONTRACT.md`
+- **Branch hygiene:** Leo — don't push to master without coordination
+- **TD internals:** `touchdesigner/TD-FRAMEWORK-GUIDE.md` + `touchdesigner/PANEL-LAYOUT-GUIDE.md`
+- **Hardware:** `firmware/esp32-rfid/LAB-SETUP-GUIDE.md`
+- **Data:** `data/SOURCES.md` + `data/METRICS_ENGINE_GAPS.md`
+- **Architecture:** `INTERFACE_CONTRACT.md`
