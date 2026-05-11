@@ -50,8 +50,13 @@ def _ensure_model():
     """Download the hand landmarker model file on first run (~8 MB)."""
     if not os.path.exists(_MODEL_PATH):
         print("[INFO] Downloading hand landmarker model (~8 MB) — one-time setup...")
-        urllib.request.urlretrieve(_MODEL_URL, _MODEL_PATH)
-        print("[INFO] Model saved.")
+        try:
+            urllib.request.urlretrieve(_MODEL_URL, _MODEL_PATH)
+            print("[INFO] Model saved.")
+        except Exception as e:
+            if os.path.exists(_MODEL_PATH):
+                os.remove(_MODEL_PATH)
+            raise RuntimeError(f"[ERROR] Model download failed: {e}") from e
 
 
 class GestureDetector:
@@ -71,6 +76,8 @@ class GestureDetector:
         self._index_fired   = False
         self._peace_fired   = False
         self._extrude_fired = False
+        self._grace_frames  = 0
+        self._t0            = time.time()
 
     # ------------------------------------------------------------------
     def _classify(self, lm):
@@ -103,7 +110,7 @@ class GestureDetector:
         now      = time.time()
         rgb      = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=rgb)
-        result   = self._landmarker.detect_for_video(mp_image, int(now * 1000))
+        result   = self._landmarker.detect_for_video(mp_image, int((now - self._t0) * 1000))
 
         actions       = []
         gesture       = 'none'
@@ -112,6 +119,7 @@ class GestureDetector:
         landmarks     = None
 
         if result.hand_landmarks:
+            self._grace_frames = 0
             lm        = result.hand_landmarks[0]   # list of 21 landmarks
             landmarks = lm
             gesture   = self._classify(lm)
@@ -146,18 +154,25 @@ class GestureDetector:
                 self._extrude_fired = True
 
         else:
-            # Hand disappeared — treat as gesture release
-            if self._current == 'fist' and self._start is not None:
-                held = now - self._start
-                if held >= DWELL_RESET:
-                    actions.append('reset')
-                elif held >= DWELL_UNDO:
-                    actions.append('undo')
-            self._current       = None
-            self._start         = None
-            self._index_fired   = False
-            self._peace_fired   = False
-            self._extrude_fired = False
+            # Hand disappeared — 3-frame grace period before resetting
+            self._grace_frames += 1
+            if self._grace_frames <= 3:
+                # Carry forward last gesture so one-frame occlusions don't break dwell
+                gesture = self._current or 'none'
+                dwell   = now - self._start if self._start else 0.0
+            else:
+                if self._current == 'fist' and self._start is not None:
+                    held = now - self._start
+                    if held >= DWELL_RESET:
+                        actions.append('reset')
+                    elif held >= DWELL_UNDO:
+                        actions.append('undo')
+                self._current       = None
+                self._start         = None
+                self._grace_frames  = 0
+                self._index_fired   = False
+                self._peace_fired   = False
+                self._extrude_fired = False
 
         return {
             'gesture':       gesture,
