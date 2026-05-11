@@ -13,6 +13,9 @@ top of this image — see TD-FRAMEWORK-GUIDE.md for the network layout.
 Reads from these TD nodes (must exist with these names):
   vision_in        OSC In CHOP   — puck positions from CV pipeline
   compute_state    Script CHOP   — method_id channel (optional)
+  lca_data         Script DAT    — optional; not used here but in the same network
+
+Colors and method names below must stay in sync with data/methods_db.json.
 """
 import math
 import numpy as np
@@ -48,11 +51,13 @@ C_PANEL_EDGE  = (0.25, 0.25, 0.28, 1.0)
 C_LINE        = (1.0,  1.0,  1.0,  0.85)
 C_PUCK_RING   = (1.0,  1.0,  1.0,  1.0)
 
+# Sourced from data/methods_db.json → methods[*].color_rgb
 METHOD_COLORS = {
-    0: (0.40, 0.40, 0.40),   # NONE        — grey
-    1: (0.85, 0.40, 0.20),   # MASONRY     — terracotta
-    2: (0.10, 0.70, 0.90),   # 3D PRINTED  — cyan
-    3: (0.95, 0.75, 0.00),   # PREFAB      — yellow
+    0: (0.40, 0.40, 0.40),   # NONE           — grey
+    1: (0.85, 0.45, 0.15),   # MASONRY        — terracotta
+    2: (0.18, 0.62, 0.85),   # 3D PRINTED     — steel blue
+    3: (0.25, 0.72, 0.45),   # PREFAB         — green
+    4: (0.72, 0.30, 0.22),   # RECLAIMED BRICK — dark red (baseline)
 }
 
 METHOD_NAMES = {
@@ -60,6 +65,7 @@ METHOD_NAMES = {
     1: "MASONRY",
     2: "3D PRINTED",
     3: "PREFAB",
+    4: "RECLAIMED BRICK",
 }
 
 FOOTPRINT_IDS   = list(range(10))

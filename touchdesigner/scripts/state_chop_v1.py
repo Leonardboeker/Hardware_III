@@ -7,7 +7,7 @@ Output channels:
   puck_count   int    how many live pucks are currently visible
   area_px2     float  footprint polygon area in projector-space pixels²
                       (0 if fewer than 3 pucks)
-  method_id    int    0=none 1=cantilever 2=column_grid 3=arch 4=truss
+  method_id    int    0=none 1=masonry 2=3d_printed 3=prefab 4=reclaimed_brick
   hb_alive     int    1 = vision pipeline is running, 0 = offline / timed out
 
 Reads from these TD nodes (must exist with these names):

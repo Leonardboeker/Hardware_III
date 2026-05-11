@@ -16,15 +16,18 @@ Textport, and add it to RFID_TO_METHOD below.
 """
 
 # Map RFID hex IDs → method index.
-# Key = uppercase hex string as sent by the ESP32 (no 0x prefix).
-# Tap each tag once with serial monitor open, copy the printed UID below.
+# Sourced from data/methods_db.json → methods[*].rfid_tag
+# NOTE: these are placeholder UIDs — Person 7 (hardware) must replace them
+# with real tag IDs read from the physical RFID pedestal before the demo.
 RFID_TO_METHOD = {
-    # 'XXXXXXXX': 1,   # Masonry
-    # 'XXXXXXXX': 2,   # 3D Printed
-    # 'XXXXXXXX': 3,   # Prefab
+    '00000000': 0,   # NONE / Reset
+    'A1B2C3D4': 1,   # MASONRY
+    'E5F6A7B8': 2,   # 3D PRINTED
+    'C9D0E1F2': 3,   # PREFAB
+    'A3B4C5D6': 4,   # RECLAIMED BRICK (baseline)
 }
 
-METHOD_NAMES = {0: 'NONE', 1: 'MASONRY', 2: '3D PRINTED', 3: 'PREFAB'}
+METHOD_NAMES = {0: 'NONE', 1: 'MASONRY', 2: '3D PRINTED', 3: 'PREFAB', 4: 'RECLAIMED BRICK'}
 
 
 def onReceive(dat, rowIndex, message, bytes):
