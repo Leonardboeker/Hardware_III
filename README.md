@@ -5,6 +5,9 @@
 **Schedule:** April 10 – May 22, 2026
 **Team:** Leo, Elais, Rafik, Seid, Onur, Nithik
 
+> **👉 Start here:** [`SYSTEM-STATUS.md`](SYSTEM-STATUS.md) — current state of every
+> subsystem, what works, what's blocked, and where each team member plugs in.
+
 ---
 
 ## Mission
