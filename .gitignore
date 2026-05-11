@@ -38,6 +38,8 @@ local/
 # Build / output
 dist/
 build/
+node_modules/
+*.tsbuildinfo
 *.log
 
 # Large binaries — review before adding (consider Git LFS if >50MB)
