@@ -91,13 +91,30 @@ def cook(scriptOp):
     # ── Puck positions (sketch footprint points) ──────────────────────────────
     pucks: dict[int, tuple[float, float]] = {}
     for pid in FOOTPRINT_IDS:
+        # Vision2 sends /puck/N (i f f) → TD names channels as puck/N:0/:1/:2
+        # (with colon) — but some TD versions / OSC In configurations name them
+        # puck/N0, puck/N1, puck/N2 (no colon). Try both.
+        pf = _chan(vision, f'puck/{pid}:0', None)
+        if pf is None:
+            pf = _chan(vision, f'puck/{pid}0', None)
+        if pf is None:
+            continue
         try:
-            pf = int(vision[f'puck/{pid}:0'][0])
-            if hb >= 0 and abs(hb - pf) <= LIVENESS_FRAMES:
-                pucks[pid] = (
-                    float(vision[f'puck/{pid}:1'][0]),
-                    float(vision[f'puck/{pid}:2'][0]),
-                )
+            pf = int(pf)
+        except Exception:
+            continue
+        if hb < 0 or abs(hb - pf) > LIVENESS_FRAMES:
+            continue
+        px = _chan(vision, f'puck/{pid}:1', None)
+        if px is None:
+            px = _chan(vision, f'puck/{pid}1', None)
+        py = _chan(vision, f'puck/{pid}:2', None)
+        if py is None:
+            py = _chan(vision, f'puck/{pid}2', None)
+        if px is None or py is None:
+            continue
+        try:
+            pucks[pid] = (float(px), float(py))
         except Exception:
             pass
 
