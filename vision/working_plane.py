@@ -1,5 +1,5 @@
 """
-Working plane computation from 4 ArUco corner markers (DICT_4X4_100).
+Working plane computation from 4 ArUco corner markers (DICT_4X4_50).
 
 Uses 4 footprint markers from PRINT_A3.pdf as table corners:
     ID 0 (Top-Left)  ───────  ID 1 (Top-Right)
@@ -15,7 +15,7 @@ Building-type selectors (also from PRINT_A3.pdf):
 import cv2
 import numpy as np
 
-ARUCO_DICT  = cv2.aruco.getPredefinedDictionary(cv2.aruco.DICT_4X4_100)
+ARUCO_DICT  = cv2.aruco.getPredefinedDictionary(cv2.aruco.DICT_4X4_50)
 DETECTOR    = cv2.aruco.ArucoDetector(ARUCO_DICT, cv2.aruco.DetectorParameters())
 
 CORNER_IDS  = {0: 0, 1: 1, 2: 2, 3: 3}   # id → corner index (TL TR BR BL)
