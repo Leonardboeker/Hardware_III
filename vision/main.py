@@ -39,9 +39,10 @@ from working_plane import (
     PLANE_W, PLANE_H,
     BUILD_IDS,
 )
-from gestures  import GestureDetector
-from sketch    import BuildingSketch
-from extrusion import load_calibration, estimate_pose, draw_walls
+from gestures   import GestureDetector
+from sketch     import BuildingSketch
+from extrusion  import load_calibration, estimate_pose, draw_walls
+from osc_bridge import VisionBridge
 
 SHOW_PLANE = True
 
@@ -105,6 +106,7 @@ def main():
 
     detector = GestureDetector()
     sketch   = BuildingSketch()
+    bridge   = VisionBridge()
 
     H = H_inv = None          # homography — persists between frames
     rvec = tvec = None        # camera pose — persists between frames
@@ -132,6 +134,15 @@ def main():
 
         # ── 3. Hand gesture detection ────────────────────────────────────
         g = detector.process(frame)
+
+        # ── 3b. Send all state to TouchDesigner via OSC ──────────────────
+        bridge.send_frame(
+            build_markers=build_markers,
+            gesture_result=g,
+            sketch=sketch,
+            is_extruded=is_extruded,
+            H=H,
+        )
 
         # ── 4. Map finger tip → working plane ───────────────────────────
         tip_cam   = g['index_tip_cam']
