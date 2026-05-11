@@ -86,14 +86,19 @@ INTEGRATION SNIPPET FOR main.py
 
 from __future__ import annotations
 
+import os
+
 from pythonosc import udp_client
 
 from working_plane import PLANE_W, PLANE_H
 
 # ── Configuration ──────────────────────────────────────────────────────────────
 
-TD_HOST = "127.0.0.1"
-TD_PORT = 7000
+# Default: same machine (127.0.0.1).
+# To stream from a different laptop to the TD machine on IAAC WLAN:
+#   set TD_HOST=172.16.21.109 python main.py
+TD_HOST = os.environ.get("TD_HOST", "127.0.0.1")
+TD_PORT = int(os.environ.get("TD_PORT", "7000"))
 
 PROJ_W = 1280   # projector canvas width  (must match footprint_viz_v5.py)
 PROJ_H = 720    # projector canvas height
