@@ -43,13 +43,25 @@ import math
 FOOTPRINT_IDS   = list(range(10))   # puck IDs 0-9 (sketch point slots)
 LIVENESS_FRAMES = 10                # max heartbeat lag before marking offline
 
+# Physical table → projector calibration. Update before demo.
+# Defaults: 0.9 m × 0.6 m table, 1280×720 projector.
+_TABLE_W_M = 0.9
+_TABLE_H_M = 0.6
+_PROJ_W    = 1280
+_PROJ_H    = 720
+_PX2_TO_M2 = (_TABLE_W_M / _PROJ_W) * (_TABLE_H_M / _PROJ_H)
+
+# Staleness tracking for hb_alive (module-level, persists between cooks)
+_last_hb_value = -1
+_last_hb_frame = -1
+
 
 def cook(scriptOp):
     scriptOp.clear()
 
     # ── Declare all output channels ───────────────────────────────────────────
     for ch in (
-        'puck_count', 'area_px2', 'method_id', 'hb_alive',
+        'puck_count', 'area_px2', 'area_m2', 'method_id', 'hb_alive',
         'sketch_points', 'sketch_walls', 'sketch_windows', 'is_extruded',
         'gesture_id', 'gesture_dwell', 'gesture_action',
         'fsm_state',
@@ -59,9 +71,14 @@ def cook(scriptOp):
     vision = op('vision_in')
 
     # ── Heartbeat / liveness ──────────────────────────────────────────────────
+    global _last_hb_value, _last_hb_frame
     try:
         hb = int(vision['vision/heartbeat:0'][0])
-        hb_alive = 1
+        td_frame = me.time.frame
+        if hb != _last_hb_value:
+            _last_hb_value = hb
+            _last_hb_frame = td_frame
+        hb_alive = 1 if (td_frame - _last_hb_frame) < 90 else 0
     except Exception:
         hb = -1
         hb_alive = 0
@@ -89,14 +106,15 @@ def cook(scriptOp):
         area = _shoelace(pts_sorted)
 
     # ── Method ID ─────────────────────────────────────────────────────────────
-    # OSC channel takes priority over the RFID stub/hardware.
-    method_id = 0
+    # Priority: VisionBridge /method/selected > rfid_in > 0 (NONE)
+    # -1 = no signal; 0 = explicit NONE/reset; 1-4 = method selected
+    method_id = -1
     try:
         method_id = int(vision['method/selected:0'][0])
     except Exception:
         pass
 
-    if method_id == 0:
+    if method_id < 0:
         # Fallback to rfid_in (Constant CHOP stub or Serial DAT)
         rfid = op('rfid_in')
         if rfid is not None:
@@ -104,9 +122,11 @@ def cook(scriptOp):
                 method_id = int(rfid['method_id'][0])
             except Exception:
                 try:
-                    method_id = int(rfid.fetch('method_id', 0))
+                    method_id = int(rfid.fetch('method_id', -1))
                 except Exception:
                     pass
+        if method_id < 0:
+            method_id = 0   # true default: no method
 
     # ── Sketch state ──────────────────────────────────────────────────────────
     sketch_points  = _int_chan(vision, 'sketch/points:0')
@@ -125,6 +145,7 @@ def cook(scriptOp):
     # ── Write outputs ─────────────────────────────────────────────────────────
     scriptOp['puck_count'][0]      = len(pucks)
     scriptOp['area_px2'][0]        = area
+    scriptOp['area_m2'][0]         = area * _PX2_TO_M2
     scriptOp['method_id'][0]       = method_id
     scriptOp['hb_alive'][0]        = hb_alive
 
