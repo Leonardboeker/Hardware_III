@@ -22,10 +22,12 @@ Output channels  (all float, consumed by render_footprint and stats_text):
   sketch_windows  int   windows added to walls
   is_extruded     int   1 when 3-D extrusion is active
 
-  ── Gesture (red puck) ───────────────────────────────────────────────────
-  gesture_id      int   0=none  1=puck (red puck visible)
-  gesture_dwell   float seconds puck has been held still
-  gesture_action  int   0=none  1=place_point  (pulses for one cook)
+  ── Gesture (puck + hand combined) ───────────────────────────────────────
+  gesture_id      int   0=none  1=puck  2=flat_fist  3=upright_fist
+                        4=index_only  5=peace  6=fist(ambiguous)
+  gesture_dwell   float seconds current gesture or puck has been held
+  gesture_action  int   0=none  1=place_point  2=add_window
+                        3=extrude  4=undo  5=reset  (pulses one cook)
 
   ── FSM content state ─────────────────────────────────────────────────
   fsm_state       int   0=IDLE 1=METHOD 2=FOOTPRINT 3=HEIGHT

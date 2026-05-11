@@ -102,15 +102,23 @@ PROJ_H = 720    # projector canvas height
 # mapped to methods_db.json method IDs
 _MARKER_TO_METHOD: dict[int, int] = {20: 1, 21: 2, 22: 3}
 
-# Red puck only has two states (was: index_only/peace/three_fingers/fist)
+# Puck detector + hand gesture detector combined
 _GESTURE_ID: dict[str, int] = {
-    "none": 0,
-    "puck": 1,
+    "none":          0,
+    "puck":          1,   # red puck visible
+    "flat_fist":     2,   # undo
+    "upright_fist":  3,   # reset
+    "index_only":    4,   # extrude
+    "peace":         5,   # add_window
+    "fist":          6,   # ambiguous fist (no action)
 }
 
-# Red puck only fires place_point; undo/reset are keyboard-only in main.py
 _ACTION_ID: dict[str, int] = {
     "place_point": 1,
+    "add_window":  2,
+    "extrude":     3,
+    "undo":        4,
+    "reset":       5,
 }
 
 _FSM_ID: dict[str, int] = {
