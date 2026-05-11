@@ -11,9 +11,12 @@ Output channels:
   hb_alive     int    1 = vision pipeline is running, 0 = offline / timed out
 
 Reads from these TD nodes (must exist with these names):
-  vision_in    OSC In CHOP   — puck data from CV pipeline
+  vision_in    OSC In CHOP   — puck data from CV pipeline; also receives
+               /method/id from vision/main.py as fallback method source
   rfid_in      Constant CHOP (stub) or Serial DAT (real ESP32)
                — must expose method_id either as channel or via .fetch
+
+Method priority: rfid_in (non-zero) > vision /method/id > 0 (none)
 """
 import math
 
@@ -51,7 +54,7 @@ def cook(scriptOp):
         except Exception:
             pass
 
-    # method id — works with both stub (Constant CHOP channel) and real (Serial DAT storage)
+    # method id — priority: RFID pedestal > vision ArUco token > 0 (none)
     method_id = 0
     rfid = op('rfid_in')
     if rfid is not None:
@@ -62,6 +65,14 @@ def cook(scriptOp):
                 method_id = int(rfid.fetch('method_id', 0))
             except Exception:
                 pass
+
+    # vision fallback: vision/main.py sends /method/id on the same OSC port
+    # so vision_in already has it — no extra TD node needed
+    if method_id == 0 and vision is not None:
+        try:
+            method_id = int(vision['method/id:0'][0])
+        except Exception:
+            pass
 
     # polygon area via shoelace on sorted points
     area = 0.0
