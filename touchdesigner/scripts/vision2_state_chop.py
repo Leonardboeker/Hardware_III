@@ -22,11 +22,10 @@ Output channels  (all float, consumed by render_footprint and stats_text):
   sketch_windows  int   windows added to walls
   is_extruded     int   1 when 3-D extrusion is active
 
-  ── Gesture ──────────────────────────────────────────────────────────────
-  gesture_id      int   0=none 1=index_only 2=peace 3=three_fingers 4=fist
-  gesture_dwell   float seconds current gesture has been held
-  gesture_action  int   last action: 0=none 1=place_point 2=add_window
-                        3=extrude 4=undo 5=reset  (pulses for one cook)
+  ── Gesture (red puck) ───────────────────────────────────────────────────
+  gesture_id      int   0=none  1=puck (red puck visible)
+  gesture_dwell   float seconds puck has been held still
+  gesture_action  int   0=none  1=place_point  (pulses for one cook)
 
   ── FSM content state ─────────────────────────────────────────────────
   fsm_state       int   0=IDLE 1=METHOD 2=FOOTPRINT 3=HEIGHT
@@ -40,8 +39,10 @@ Usage in expressions elsewhere in the TD network:
 
 import math
 
-FOOTPRINT_IDS   = list(range(10))   # puck IDs 0-9 (sketch point slots)
-LIVENESS_FRAMES = 10                # max heartbeat lag before marking offline
+FOOTPRINT_IDS    = list(range(10))  # puck IDs 0-9 (sketch point slots)
+LIVENESS_FRAMES  = 10               # frame-count tolerance for puck freshness
+HB_TIMEOUT_TICKS = 90               # TD frames of silence before hb_alive → 0
+                                    # (≈3 s at 30 fps)
 
 # Physical table → projector calibration. Update before demo.
 # Defaults: 0.9 m × 0.6 m table, 1280×720 projector.
@@ -51,7 +52,7 @@ _PROJ_W    = 1280
 _PROJ_H    = 720
 _PX2_TO_M2 = (_TABLE_W_M / _PROJ_W) * (_TABLE_H_M / _PROJ_H)
 
-# Staleness tracking for hb_alive (module-level, persists between cooks)
+# Heartbeat staleness tracking — persists between cooks at module level
 _last_hb_value = -1
 _last_hb_frame = -1
 
@@ -71,6 +72,9 @@ def cook(scriptOp):
     vision = op('vision_in')
 
     # ── Heartbeat / liveness ──────────────────────────────────────────────────
+    # hb_alive only goes 1 when the heartbeat counter is actively advancing.
+    # A stale value (pipeline frozen or disconnected) times out after
+    # HB_TIMEOUT_TICKS TD frames (~3 s at 30 fps).
     global _last_hb_value, _last_hb_frame
     try:
         hb = int(vision['vision/heartbeat:0'][0])
@@ -78,7 +82,7 @@ def cook(scriptOp):
         if hb != _last_hb_value:
             _last_hb_value = hb
             _last_hb_frame = td_frame
-        hb_alive = 1 if (td_frame - _last_hb_frame) < 90 else 0
+        hb_alive = 1 if (td_frame - _last_hb_frame) < HB_TIMEOUT_TICKS else 0
     except Exception:
         hb = -1
         hb_alive = 0

@@ -90,10 +90,10 @@ def cook(scriptOp):
         if method_id < 0:
             print('[state_chop] rfid_in not returning method_id — check node type/name')
 
-    # vision fallback: vision/main.py sends /method/id when ArUco method token detected
+    # vision fallback: osc_bridge.py sends /method/selected each frame
     if method_id < 0 and vision is not None:
         try:
-            method_id = int(vision['method/id:0'][0])
+            method_id = int(vision['method/selected:0'][0])
         except Exception:
             method_id = 0   # true default: no method
 
