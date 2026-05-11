@@ -13,19 +13,18 @@ Setup
 5. Run calibrate.py once (checkerboard) — saves calibration.npz.
 6. Run:  python main.py
 
-Gestures (hand must be inside the working plane area)
-------------------------------------------------------
-  Index finger     hold 3 s   → place a footprint point
-  Peace (V)        hold 3 s   → add window to nearest wall
-  Three fingers    hold 4 s   → extrude footprint into 3-D walls
-  Fist             release ~4 s → undo last action
-  Fist             release ~5 s → reset / clear everything
+Red puck interaction (puck must be inside the working plane area)
+-----------------------------------------------------------------
+  Red puck held still 3 s   → place a footprint point
+  Move puck away then back  → re-arm for next placement
 
 Keys
 ----
   Q  quit
   P  toggle working-plane debug window
   E  toggle extrusion on/off manually
+  U  undo last point
+  R  reset / clear everything
 """
 
 import cv2
@@ -39,7 +38,7 @@ from working_plane import (
     PLANE_W, PLANE_H,
     BUILD_IDS,
 )
-from gestures   import GestureDetector
+from puck_detector import RedPuckDetector
 from sketch     import BuildingSketch
 from extrusion  import load_calibration, estimate_pose, draw_walls
 from osc_bridge import VisionBridge
@@ -81,7 +80,7 @@ def main():
     # Camera calibration (needed for accurate 3-D projection)
     K, dist = load_calibration()
 
-    detector = GestureDetector()
+    detector = RedPuckDetector()
     sketch   = BuildingSketch()
     bridge   = VisionBridge()
 
@@ -109,7 +108,7 @@ def main():
         if new_rv is not None:
             rvec, tvec = new_rv, new_tv
 
-        # ── 3. Hand gesture detection ────────────────────────────────────
+        # ── 3. Red puck detection ────────────────────────────────────────
         g = detector.process(frame)
 
         # ── 3b. Send all state to TouchDesigner via OSC ──────────────────
@@ -121,7 +120,7 @@ def main():
             H=H,
         )
 
-        # ── 4. Map finger tip → working plane ───────────────────────────
+        # ── 4. Map puck centre → working plane ──────────────────────────
         tip_cam   = g['index_tip_cam']
         tip_plane = cam_to_plane(tip_cam, H)
         tip_valid = is_inside_plane(tip_plane)
@@ -134,32 +133,7 @@ def main():
                     print(f"[+] Point {len(sketch.points)} placed at "
                           f"({tip_plane[0]:.0f}, {tip_plane[1]:.0f})")
                 else:
-                    print("[!] Finger outside working plane — move inside to place point")
-
-            elif action == 'add_window':
-                walls = sketch.get_wall_segments()
-                if walls:
-                    idx = sketch.nearest_wall(tip_plane) if tip_valid else 0
-                    sketch.add_window(idx)
-                    print(f"[W] Window added to wall {idx}")
-                else:
-                    print("[!] No walls yet — place at least 2 points first")
-
-            elif action == 'extrude':
-                if len(sketch.get_wall_segments()) >= 1:
-                    is_extruded = True
-                    print("[3D] Extrusion activated")
-                else:
-                    print("[!] Draw at least 2 points before extruding")
-
-            elif action == 'undo':
-                sketch.undo()
-                print("[<] Undo")
-
-            elif action == 'reset':
-                sketch.reset()
-                is_extruded = False
-                print("[X] Reset")
+                    print("[!] Puck outside working plane — move inside to place point")
 
         # ── 6. Draw ──────────────────────────────────────────────────────
         draw_working_plane(frame, H_inv)
@@ -194,8 +168,13 @@ def main():
         if key == ord('e'):
             is_extruded = not is_extruded
             print(f"[E] Extrusion {'ON' if is_extruded else 'OFF'}")
-
-    detector.close()
+        if key == ord('u'):
+            sketch.undo()
+            print("[<] Undo")
+        if key == ord('r'):
+            sketch.reset()
+            is_extruded = False
+            print("[X] Reset")
     cap.release()
     cv2.destroyAllWindows()
 
@@ -215,7 +194,7 @@ def _draw_status(frame, H, sketch, tip_valid, is_extruded):
         in_out = "IN PLANE" if tip_valid else "outside"
         mode   = "3D EXTRUDED" if is_extruded else "2D sketch"
         msg    = (f"Pts:{n_pts}  Walls:{n_seg}  Win:{n_win}  "
-                  f"|  finger:{in_out}  |  {mode}")
+                  f"|  puck:{in_out}  |  {mode}")
         color  = (0, 200, 100) if is_extruded else (200, 200, 200)
 
     cv2.putText(frame, msg, (10, 28), cv2.FONT_HERSHEY_SIMPLEX, 0.55, color, 2)
