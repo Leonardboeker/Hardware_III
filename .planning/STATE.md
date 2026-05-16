@@ -55,6 +55,12 @@ Backed by `docs/research/lit-review/` (six per-strand reports + OVERVIEW.md + AC
 4. **Methodology-wobble is a first-class projection layer**, not a footnote.
 5. **AI-generated phase animations paused** until tier-1 LCA numbers are sourced.
 
+## Accumulated Context
+
+### Roadmap Evolution
+
+- 2026-05-16 — Phase **02.1 — Height Slider Integration** inserted after Phase 2 (URGENT). Reason: DollaTek 10K linear-slide potentiometer arrived; replaces ArUco-Dial ID-10 as HEIGHT input. Drives HEIGHT FSM via existing ESP32-RFID Serial pipe (no new WiFi/OSC path). Touches: `firmware/esp32-rfid/esp32_rfid/esp32_rfid.ino`, `touchdesigner/scripts/serial_rfid_v1.py`, `touchdesigner/scripts/vision2_state_chop.py`, `INTERFACE_CONTRACT.md` §9, `.planning/FSM_TOUCHDESIGNER_SPEC.md`, `data/methods_db.json`. Next: `/gsd:plan-phase 02.1`.
+
 ## Notes
 
 - Phase 1 deliverables submitted April 17 (`Group_3_Hardware_III_Proposal.pdf` on master).

@@ -62,15 +62,20 @@ All phase goals and success criteria should be interpreted through this separati
 
 ---
 
-### Phase 02.1: Height Slider Integration - DollaTek 10K slide potentiometer on ESP32-RFID GPIO34, drives HEIGHT FSM state via Serial. Replaces ArUco-Dial ID-10. (INSERTED)
+### Phase 02.1: Height Slider Integration (INSERTED)
 
-**Goal:** [Urgent work - to be planned]
-**Requirements**: TBD
-**Depends on:** Phase 2
-**Plans:** 0 plans
-
-Plans:
-- [ ] TBD (run /gsd:plan-phase 02.1 to break down)
+**Goal**: Wire DollaTek 10K linear-slide potentiometer to the existing ESP32-RFID via ADC + Serial pipe so the HEIGHT FSM state is driven by a physical slider (1..N floors) instead of an ArUco dial. Closed-loop CV is untouched.
+**Depends on**: Phase 2
+**Deadline**: TBD (before Phase 3 FSM wiring)
+**Requirements**: INP-03 (extended — slider replaces dial ID-10)
+**Success Criteria** (what must be TRUE):
+  1. ESP32-RFID firmware reads slider ADC (GPIO34), applies median + EMA smoothing and floor-boundary hysteresis, emits `FLOOR:N` (on change) and `SLIDER:0.xxx` (periodic) over Serial @115200.
+  2. TouchDesigner `serial_rfid_v1.py` parses new prefixes and stores `floor` + `slider_raw` on the Serial DAT alongside existing `method_id`.
+  3. `vision2_state_chop.py` exposes `floor`, `slider_raw`, `slider_alive` channels; HEIGHT state consumes `floor`, ArUco dial ID-10 path retired.
+  4. `INTERFACE_CONTRACT.md` Section 9 (Sensor / ESP32) extended with the three new fields; `FSM_TOUCHDESIGNER_SPEC.md` HEIGHT-state input updated.
+  5. Per-method floor cap honored (e.g. earth 3DP = 1) via `data/methods_db.json` `max_floors`; validation feedback when slider exceeds cap.
+  6. Demo path proven end-to-end: slider movement → floor change visible in TD textport + stats overlay within 100 ms, no jitter at floor boundaries.
+**Plans**: TBD (run `/gsd:plan-phase 02.1`)
 
 ### Phase 3: FSM Implementation & Assembly Logic
 **Goal**: Scale the Phase 2 vertical slice into the **full FSM running in TouchDesigner** (replaces the originally-planned Grasshopper/Anemone). Every transition is gated by closed-loop CV — no button-advance baseline.
