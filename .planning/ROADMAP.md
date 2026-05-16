@@ -62,6 +62,16 @@ All phase goals and success criteria should be interpreted through this separati
 
 ---
 
+### Phase 02.1: Height Slider Integration - DollaTek 10K slide potentiometer on ESP32-RFID GPIO34, drives HEIGHT FSM state via Serial. Replaces ArUco-Dial ID-10. (INSERTED)
+
+**Goal:** [Urgent work - to be planned]
+**Requirements**: TBD
+**Depends on:** Phase 2
+**Plans:** 0 plans
+
+Plans:
+- [ ] TBD (run /gsd:plan-phase 02.1 to break down)
+
 ### Phase 3: FSM Implementation & Assembly Logic
 **Goal**: Scale the Phase 2 vertical slice into the **full FSM running in TouchDesigner** (replaces the originally-planned Grasshopper/Anemone). Every transition is gated by closed-loop CV — no button-advance baseline.
 **Depends on**: Phase 2
