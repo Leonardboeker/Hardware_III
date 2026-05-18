@@ -1,4 +1,4 @@
-"""panel_text — text content generators for every UI panel.
+﻿"""panel_text — text content generators for every UI panel.
 
 How to use in TD:
     1. Add → DAT → Text  →  rename to `panel_text`

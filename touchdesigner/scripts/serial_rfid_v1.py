@@ -1,4 +1,4 @@
-﻿"""rfid_in - Serial DAT callbacks.
+﻿﻿﻿"""rfid_in - Serial DAT callbacks.
 
 Reads tag-to-method mapping from data/methods_db.json so hardware updates do
 not require Python edits.
