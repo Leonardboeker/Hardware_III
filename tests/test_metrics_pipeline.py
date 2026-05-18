@@ -107,6 +107,42 @@ class MetricsPipelineTests(unittest.TestCase):
         low, high, warning = scale_numeric_range("per_m2_wall", 1.0, 2.0, scenario, rules)
         self.assertEqual((low, high, warning), (360.0, 720.0, None))
 
+    def test_roof_area_values_use_footprint_area(self) -> None:
+        rules = load_normalization_rules()
+        scenario = ScenarioInput(method="masonry", area_m2=100, floors=3)
+        low, high, warning = scale_numeric_range(
+            "per_m2_roof_area",
+            1.0,
+            2.0,
+            scenario,
+            rules,
+        )
+        self.assertEqual((low, high, warning), (100.0, 200.0, None))
+
+    def test_opening_area_values_use_gross_floor_area(self) -> None:
+        rules = load_normalization_rules()
+        scenario = ScenarioInput(method="masonry", area_m2=100, floors=3)
+        low, high, warning = scale_numeric_range(
+            "per_m2_opening_area",
+            1.0,
+            2.0,
+            scenario,
+            rules,
+        )
+        self.assertEqual((low, high, warning), (300.0, 600.0, None))
+
+    def test_finished_surface_values_use_wall_surface_proxy(self) -> None:
+        rules = load_normalization_rules()
+        scenario = ScenarioInput(method="masonry", area_m2=100, floors=2)
+        low, high, warning = scale_numeric_range(
+            "per_m2_finished_surface",
+            1.0,
+            2.0,
+            scenario,
+            rules,
+        )
+        self.assertEqual((low, high, warning), (360.0, 720.0, None))
+
     def test_gfa_rows_scale_with_floor_count(self) -> None:
         floors_1 = build_method_output("masonry", area_m2=100, floors=1)
         floors_3 = build_method_output("masonry", area_m2=100, floors=3)
