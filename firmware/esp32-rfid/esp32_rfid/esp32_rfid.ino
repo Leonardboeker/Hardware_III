@@ -33,6 +33,13 @@ constexpr unsigned long SLIDER_POLL_MS = 50;       // ADC sample cadence
 constexpr unsigned long SLIDER_EMIT_MS = 200;      // SLIDER:0.xxx periodic emit
 constexpr float    SLIDER_MV_MAX       = 3300.0f;  // ADC_11db: full range ~0..3300 mV
 
+// ---- Slider B (second DollaTek 10K, BUILDING_PHASE switch, Manual-Override-Only) ----
+// GPIO35 is input-only on ESP32, ADC1_CH7, WiFi-safe.
+constexpr uint8_t  SLIDER_B_PIN          = 35;
+// No MAX_PHASES here — phase count is per-method, quantized TD-side (see CONTEXT.md Slider B amendment).
+constexpr unsigned long SLIDER_B_POLL_MS = 50;     // ADC sample cadence (same as Slider A)
+constexpr unsigned long SLIDER_B_EMIT_MS = 200;    // PSLIDER:0.xxx periodic emit
+
 MFRC522 rfid(SS_PIN, RST_PIN);
 
 // Debounce: ignore re-reads of the same tag for this many ms.
@@ -50,6 +57,14 @@ uint8_t  lastFloor                = 1;          // 1..MAX_FLOORS
 float    lastFloorCenter          = 0.0f;       // normalized centre of lastFloor (for hysteresis)
 unsigned long lastSliderPollMs    = 0;
 unsigned long lastSliderEmitMs    = 0;
+
+// ---- Slider B state ----
+uint16_t sliderBBuf[MEDIAN_WINDOW]   = {0};
+uint8_t  sliderBBufCount             = 0;
+uint8_t  sliderBBufHead              = 0;
+float    sliderBEma                  = 0.0f;
+unsigned long lastSliderBPollMs      = 0;
+unsigned long lastSliderBEmitMs      = 0;
 
 // Floor centre for a given 1..MAX_FLOORS index, in normalized [0, 1] space.
 static inline float floorCenter(uint8_t f) {
@@ -86,6 +101,10 @@ void setup() {
   analogReadResolution(12);              // 0..4095 raw if we ever need raw; we use millivolts API
   lastSliderPollMs = millis();
   lastSliderEmitMs = millis();
+  // Slider B ADC: 0..3.3 V full range
+  analogSetPinAttenuation(SLIDER_B_PIN, ADC_11db);
+  lastSliderBPollMs = millis();
+  lastSliderBEmitMs = millis();
   SPI.begin();
   rfid.PCD_Init();
   Serial.println("BOOT:rfid_reader_ready");
@@ -151,6 +170,47 @@ void loop() {
   if (now - lastSliderEmitMs >= SLIDER_EMIT_MS) {
     lastSliderEmitMs = now;
     Serial.printf("SLIDER:%.3f\n", sliderEma);
+  }
+
+  // ---- Slider B poll (every SLIDER_B_POLL_MS ms) — NO quantization/hysteresis in firmware ----
+  if (now - lastSliderBPollMs >= SLIDER_B_POLL_MS) {
+    lastSliderBPollMs = now;
+
+    // 1) Sample ADC in millivolts.
+    uint32_t mvB = analogReadMilliVolts(SLIDER_B_PIN);
+    if (mvB > (uint32_t)SLIDER_MV_MAX) mvB = (uint32_t)SLIDER_MV_MAX;
+
+    // 2) Push into ring buffer.
+    sliderBBuf[sliderBBufHead] = (uint16_t)mvB;
+    sliderBBufHead = (sliderBBufHead + 1) % MEDIAN_WINDOW;
+    if (sliderBBufCount < MEDIAN_WINDOW) sliderBBufCount++;
+
+    // 3) Median FIRST — inline (own buffer, can't reuse sliderMedian()).
+    uint8_t nB = sliderBBufCount;
+    if (nB > 0) {
+      uint16_t copyB[MEDIAN_WINDOW];
+      for (uint8_t i = 0; i < nB; i++) copyB[i] = sliderBBuf[i];
+      std::nth_element(copyB, copyB + nB / 2, copyB + nB);
+      uint16_t medB_mv = copyB[nB / 2];
+      float    medB_norm = (float)medB_mv / SLIDER_MV_MAX;
+      if (medB_norm < 0.0f) medB_norm = 0.0f;
+      if (medB_norm > 1.0f) medB_norm = 1.0f;
+
+      // 4) EMA SECOND.
+      static bool emaBSeeded = false;
+      if (!emaBSeeded) {
+        sliderBEma = medB_norm;
+        emaBSeeded = true;
+      } else {
+        sliderBEma = (EMA_ALPHA * medB_norm) + ((1.0f - EMA_ALPHA) * sliderBEma);
+      }
+    }
+  }
+
+  // ---- Slider B periodic emit (every SLIDER_B_EMIT_MS ms) ----
+  if (now - lastSliderBEmitMs >= SLIDER_B_EMIT_MS) {
+    lastSliderBEmitMs = now;
+    Serial.printf("PSLIDER:%.3f\n", sliderBEma);
   }
 
   if (!rfid.PICC_IsNewCardPresent()) return;
