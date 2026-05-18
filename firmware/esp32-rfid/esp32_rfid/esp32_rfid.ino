@@ -17,9 +17,21 @@
 
 #include <SPI.h>
 #include <MFRC522.h>
+#include <algorithm>
 
 constexpr uint8_t SS_PIN  = 5;
 constexpr uint8_t RST_PIN = 27;
+
+// ---- Slider (DollaTek 10K linear-slide potentiometer) ----
+// GPIO34 is input-only on ESP32, ADC1_CH6, WiFi-safe.
+constexpr uint8_t  SLIDER_PIN          = 34;
+constexpr uint8_t  MAX_FLOORS          = 5;        // upper bound; per-method caps live TD-side
+constexpr uint8_t  MEDIAN_WINDOW       = 8;        // ring buffer size (CONTEXT.md: median FIRST)
+constexpr float    EMA_ALPHA           = 0.2f;     // tune in jitter test (CONTEXT.md starting point)
+constexpr float    HYST_EPSILON        = 0.02f;    // CONTEXT.md hysteresis nudge
+constexpr unsigned long SLIDER_POLL_MS = 50;       // ADC sample cadence
+constexpr unsigned long SLIDER_EMIT_MS = 200;      // SLIDER:0.xxx periodic emit
+constexpr float    SLIDER_MV_MAX       = 3300.0f;  // ADC_11db: full range ~0..3300 mV
 
 MFRC522 rfid(SS_PIN, RST_PIN);
 
@@ -28,6 +40,43 @@ constexpr unsigned long REREAD_MS = 1500;
 
 String   lastUid     = "";
 unsigned long lastReadMs = 0;
+
+// ---- Slider state ----
+uint16_t sliderBuf[MEDIAN_WINDOW] = {0};
+uint8_t  sliderBufCount           = 0;          // grows to MEDIAN_WINDOW then stays
+uint8_t  sliderBufHead            = 0;          // circular write index
+float    sliderEma                = 0.0f;       // last smoothed normalized value [0, 1]
+uint8_t  lastFloor                = 1;          // 1..MAX_FLOORS
+float    lastFloorCenter          = 0.0f;       // normalized centre of lastFloor (for hysteresis)
+unsigned long lastSliderPollMs    = 0;
+unsigned long lastSliderEmitMs    = 0;
+
+// Floor centre for a given 1..MAX_FLOORS index, in normalized [0, 1] space.
+static inline float floorCenter(uint8_t f) {
+  if (MAX_FLOORS <= 1) return 0.0f;
+  return (float)(f - 1) / (float)(MAX_FLOORS - 1);
+}
+
+// Quantize a normalized [0, 1] value to a floor 1..MAX_FLOORS.
+static inline uint8_t quantizeFloor(float norm) {
+  if (norm < 0.0f) norm = 0.0f;
+  if (norm > 1.0f) norm = 1.0f;
+  float f = 1.0f + norm * (float)(MAX_FLOORS - 1);
+  long  r = lroundf(f);
+  if (r < 1) r = 1;
+  if (r > (long)MAX_FLOORS) r = MAX_FLOORS;
+  return (uint8_t)r;
+}
+
+// Median of the live samples in sliderBuf (only the first sliderBufCount entries are valid).
+static inline uint16_t sliderMedian() {
+  uint16_t copy[MEDIAN_WINDOW];
+  uint8_t  n = sliderBufCount;
+  if (n == 0) return 0;
+  for (uint8_t i = 0; i < n; i++) copy[i] = sliderBuf[i];
+  std::nth_element(copy, copy + n / 2, copy + n);
+  return copy[n / 2];
+}
 
 void setup() {
   Serial.begin(115200);
