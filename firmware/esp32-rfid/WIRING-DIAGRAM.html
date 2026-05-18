@@ -1,0 +1,562 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Hardware III — Verkabelungsdiagramm (Phase 02.1)</title>
+<style>
+  :root {
+    --bg:        #1a1d24;
+    --panel:     #252932;
+    --panel-2:   #2d323d;
+    --border:    #3a3f4b;
+    --text:      #e8eaed;
+    --muted:     #9aa0a6;
+    --accent:    #4dabf7;
+
+    /* Wire colors — match the German "Farbe" column in LAB-SETUP-GUIDE.md */
+    --col-3v3:    #e74c3c;  /* ROT */
+    --col-gnd:    #2c2f36;  /* SCHWARZ (with light stroke for visibility on dark bg) */
+    --col-gnd-s:  #8d9197;
+    --col-adcA:   #f39c12;  /* ORANGE  — Slider A wiper */
+    --col-adcB:   #f1c40f;  /* GELB    — Slider B wiper */
+    --col-ss:     #b388ff;  /* LILA    — SPI SS / SDA */
+    --col-sck:    #4dabf7;  /* BLAU    — SPI clock */
+    --col-mosi:   #2ecc71;  /* GRÜN    — SPI MOSI */
+    --col-miso:   #1abc9c;  /* TÜRKIS  — SPI MISO */
+    --col-rst:    #ecf0f1;  /* WEISS   — RC522 reset */
+
+    /* Component fills */
+    --comp-esp:    #2c3e50;
+    --comp-esp-s:  #5d7287;
+    --comp-rfid:   #6b3470;
+    --comp-rfid-s: #a16ba8;
+    --comp-sld:    #1f6f5c;
+    --comp-sld-s:  #36ad8d;
+  }
+  * { box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    margin: 0;
+    padding: 32px;
+    line-height: 1.55;
+    font-size: 15px;
+  }
+  .container { max-width: 1280px; margin: 0 auto; }
+  header { margin-bottom: 28px; }
+  h1 { margin: 0 0 6px 0; font-size: 28px; font-weight: 600; letter-spacing: -0.3px; }
+  header .subtitle { color: var(--muted); font-size: 16px; margin: 0; }
+  header .meta { color: var(--muted); font-size: 13px; margin-top: 8px; }
+  header .meta code {
+    background: var(--panel);
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-size: 12px;
+    color: var(--accent);
+  }
+
+  section { margin-bottom: 28px; }
+  h2 {
+    font-size: 18px;
+    font-weight: 600;
+    margin: 0 0 14px 0;
+    color: var(--text);
+  }
+
+  .diagram-card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 28px;
+  }
+  .diagram-card svg {
+    display: block;
+    width: 100%;
+    height: auto;
+    max-height: 720px;
+  }
+
+  .info-grid {
+    display: grid;
+    grid-template-columns: 1.1fr 1fr;
+    gap: 20px;
+    margin-bottom: 28px;
+  }
+  @media (max-width: 900px) {
+    .info-grid { grid-template-columns: 1fr; }
+  }
+
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 22px 24px;
+  }
+
+  table { width: 100%; border-collapse: collapse; }
+  th, td {
+    text-align: left;
+    padding: 9px 10px;
+    border-bottom: 1px solid var(--border);
+    font-size: 13.5px;
+  }
+  th {
+    color: var(--muted);
+    font-weight: 500;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    background: var(--panel-2);
+  }
+  td.pin, td.mono {
+    font-family: "SF Mono", "Cascadia Code", "Consolas", monospace;
+    font-size: 12.5px;
+  }
+  tr:last-child td { border-bottom: none; }
+
+  .swatch {
+    display: inline-block;
+    width: 32px;
+    height: 4px;
+    border-radius: 2px;
+    margin-right: 10px;
+    vertical-align: middle;
+    box-shadow: 0 0 0 1px var(--border);
+  }
+  .legend-row td:first-child { white-space: nowrap; }
+
+  .notes-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+  }
+  @media (max-width: 900px) {
+    .notes-grid { grid-template-columns: 1fr; }
+  }
+  .note {
+    padding: 14px 16px;
+    border-radius: 8px;
+    border-left: 3px solid;
+    font-size: 14px;
+    line-height: 1.5;
+  }
+  .note strong { font-weight: 600; }
+  .note-warn { background: rgba(231, 76, 60, 0.10); border-left-color: var(--col-3v3); }
+  .note-info { background: rgba(77, 171, 247, 0.10); border-left-color: var(--accent); }
+  .note-ok   { background: rgba(46, 204, 113, 0.10); border-left-color: var(--col-mosi); }
+
+  footer {
+    color: var(--muted);
+    font-size: 12.5px;
+    text-align: center;
+    margin-top: 32px;
+    padding-top: 20px;
+    border-top: 1px solid var(--border);
+  }
+  footer code { color: var(--accent); background: var(--panel); padding: 2px 5px; border-radius: 3px; }
+
+  @media print {
+    body { background: white; color: black; padding: 16px; }
+    .diagram-card, .card { background: white; border: 1px solid #ccc; }
+    th { background: #f5f5f5; color: #666; }
+    .note { background: #f9f9f9; }
+    .swatch { box-shadow: 0 0 0 1px #999; }
+    footer { color: #888; }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <header>
+    <h1>Hardware III &mdash; Verkabelungsdiagramm</h1>
+    <p class="subtitle">Phase 02.1 &middot; RC522 RFID + Slider A (HEIGHT) + Slider B (BUILDING_PHASE)</p>
+    <p class="meta">
+      Board: <code>ESP32 Dev Module</code> &middot;
+      Sketch: <code>firmware/esp32-rfid/esp32_rfid/esp32_rfid.ino</code> &middot;
+      Stand: 2026-05-16
+    </p>
+  </header>
+
+  <section class="diagram-card">
+    <svg viewBox="0 0 1200 820" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="ESP32 Verkabelungsdiagramm">
+
+      <!-- ============================================================
+           DEFS: arrowheads, filters
+           ============================================================ -->
+      <defs>
+        <filter id="shadow" x="-10%" y="-10%" width="120%" height="120%">
+          <feGaussianBlur in="SourceAlpha" stdDeviation="2"/>
+          <feOffset dx="0" dy="2"/>
+          <feComponentTransfer><feFuncA type="linear" slope="0.4"/></feComponentTransfer>
+          <feMerge>
+            <feMergeNode/>
+            <feMergeNode in="SourceGraphic"/>
+          </feMerge>
+        </filter>
+      </defs>
+
+      <!-- ============================================================
+           ESP32 dev module (left side, vertical orientation)
+           pos: x=80..280, y=140..720
+           pins on RIGHT edge (x=280)
+           ============================================================ -->
+      <g id="esp32">
+        <rect x="80" y="140" width="200" height="580"
+              rx="10" fill="#2c3e50" stroke="#5d7287" stroke-width="2" filter="url(#shadow)"/>
+
+        <!-- USB connector hint -->
+        <rect x="80" y="225" width="14" height="50" fill="#3a4858" stroke="#5d7287" stroke-width="1"/>
+        <text x="60" y="255" text-anchor="end" fill="#8d9197" font-size="10" font-family="monospace">USB</text>
+
+        <!-- Title -->
+        <text x="180" y="180" text-anchor="middle" fill="#e8eaed" font-size="18" font-weight="600">ESP32</text>
+        <text x="180" y="200" text-anchor="middle" fill="#a8c1d8" font-size="12">Dev Module</text>
+
+        <!-- Right-edge pin column -->
+        <!-- y positions: 240..680 in 9 slots -->
+
+        <!-- Pin: 3V3 -->
+        <circle cx="280" cy="240" r="6" fill="#e74c3c"/>
+        <text x="270" y="244" text-anchor="end" fill="#e8eaed" font-size="13" font-family="monospace" font-weight="600">3V3</text>
+
+        <!-- Pin: GND -->
+        <circle cx="280" cy="285" r="6" fill="#7f8c8d" stroke="#bdc3c7" stroke-width="1"/>
+        <text x="270" y="289" text-anchor="end" fill="#e8eaed" font-size="13" font-family="monospace" font-weight="600">GND</text>
+
+        <!-- Pin: GPIO34 (Slider A wiper) -->
+        <circle cx="280" cy="345" r="6" fill="#f39c12"/>
+        <text x="270" y="349" text-anchor="end" fill="#e8eaed" font-size="13" font-family="monospace" font-weight="600">GPIO 34</text>
+        <text x="270" y="364" text-anchor="end" fill="#9aa0a6" font-size="10" font-family="monospace">ADC1_CH6</text>
+
+        <!-- Pin: GPIO35 (Slider B wiper) -->
+        <circle cx="280" cy="390" r="6" fill="#f1c40f"/>
+        <text x="270" y="394" text-anchor="end" fill="#e8eaed" font-size="13" font-family="monospace" font-weight="600">GPIO 35</text>
+        <text x="270" y="409" text-anchor="end" fill="#9aa0a6" font-size="10" font-family="monospace">ADC1_CH7</text>
+
+        <!-- Pin: GPIO5 (SS/SDA) -->
+        <circle cx="280" cy="450" r="6" fill="#b388ff"/>
+        <text x="270" y="454" text-anchor="end" fill="#e8eaed" font-size="13" font-family="monospace" font-weight="600">GPIO 5</text>
+        <text x="270" y="469" text-anchor="end" fill="#9aa0a6" font-size="10" font-family="monospace">SS</text>
+
+        <!-- Pin: GPIO18 (SCK) -->
+        <circle cx="280" cy="495" r="6" fill="#4dabf7"/>
+        <text x="270" y="499" text-anchor="end" fill="#e8eaed" font-size="13" font-family="monospace" font-weight="600">GPIO 18</text>
+        <text x="270" y="514" text-anchor="end" fill="#9aa0a6" font-size="10" font-family="monospace">SCK</text>
+
+        <!-- Pin: GPIO19 (MISO) -->
+        <circle cx="280" cy="540" r="6" fill="#1abc9c"/>
+        <text x="270" y="544" text-anchor="end" fill="#e8eaed" font-size="13" font-family="monospace" font-weight="600">GPIO 19</text>
+        <text x="270" y="559" text-anchor="end" fill="#9aa0a6" font-size="10" font-family="monospace">MISO</text>
+
+        <!-- Pin: GPIO23 (MOSI) -->
+        <circle cx="280" cy="585" r="6" fill="#2ecc71"/>
+        <text x="270" y="589" text-anchor="end" fill="#e8eaed" font-size="13" font-family="monospace" font-weight="600">GPIO 23</text>
+        <text x="270" y="604" text-anchor="end" fill="#9aa0a6" font-size="10" font-family="monospace">MOSI</text>
+
+        <!-- Pin: GPIO27 (RST) -->
+        <circle cx="280" cy="640" r="6" fill="#ecf0f1" stroke="#bdc3c7" stroke-width="1"/>
+        <text x="270" y="644" text-anchor="end" fill="#e8eaed" font-size="13" font-family="monospace" font-weight="600">GPIO 27</text>
+        <text x="270" y="659" text-anchor="end" fill="#9aa0a6" font-size="10" font-family="monospace">RST</text>
+
+      </g>
+
+      <!-- ============================================================
+           Slider A (HEIGHT)
+           pos: x=720..960, y=100..220
+           pins on LEFT edge (x=720)
+           ============================================================ -->
+      <g id="slider-a">
+        <rect x="720" y="100" width="240" height="120"
+              rx="8" fill="#1f6f5c" stroke="#36ad8d" stroke-width="2" filter="url(#shadow)"/>
+        <text x="840" y="130" text-anchor="middle" fill="#e8eaed" font-size="16" font-weight="600">Slider A</text>
+        <text x="840" y="148" text-anchor="middle" fill="#a8e0d2" font-size="11">DollaTek 10K &middot; HEIGHT</text>
+        <!-- Visual slider track -->
+        <rect x="760" y="170" width="160" height="14" rx="7" fill="#0f4035" stroke="#36ad8d" stroke-width="1"/>
+        <rect x="840" y="166" width="20" height="22" rx="3" fill="#e8eaed" stroke="#36ad8d" stroke-width="1"/>
+
+        <!-- Pins on LEFT edge -->
+        <circle cx="720" cy="130" r="6" fill="#e74c3c"/>
+        <text x="710" y="134" text-anchor="end" fill="#e8eaed" font-size="12" font-family="monospace">VCC</text>
+
+        <circle cx="720" cy="160" r="6" fill="#f39c12"/>
+        <text x="710" y="164" text-anchor="end" fill="#e8eaed" font-size="12" font-family="monospace">Wiper</text>
+
+        <circle cx="720" cy="190" r="6" fill="#7f8c8d" stroke="#bdc3c7" stroke-width="1"/>
+        <text x="710" y="194" text-anchor="end" fill="#e8eaed" font-size="12" font-family="monospace">GND</text>
+      </g>
+
+      <!-- ============================================================
+           RC522 RFID Reader
+           pos: x=720..960, y=290..510
+           pins on LEFT edge (x=720)
+           ============================================================ -->
+      <g id="rc522">
+        <rect x="720" y="290" width="240" height="220"
+              rx="8" fill="#6b3470" stroke="#a16ba8" stroke-width="2" filter="url(#shadow)"/>
+        <text x="840" y="320" text-anchor="middle" fill="#e8eaed" font-size="16" font-weight="600">RC522</text>
+        <text x="840" y="338" text-anchor="middle" fill="#e1c4e7" font-size="11">MFRC522 13.56 MHz</text>
+        <!-- Antenna coil hint -->
+        <rect x="800" y="370" width="120" height="120" rx="4" fill="none" stroke="#a16ba8" stroke-width="1.5" stroke-dasharray="4 3"/>
+        <text x="860" y="436" text-anchor="middle" fill="#a16ba8" font-size="11" font-style="italic">ANT</text>
+
+        <!-- Pins on LEFT edge (28 px spacing, 3.3V at 340 .. RST at 508) -->
+        <circle cx="720" cy="340" r="6" fill="#e74c3c"/>
+        <text x="710" y="344" text-anchor="end" fill="#e8eaed" font-size="12" font-family="monospace">3.3V</text>
+
+        <circle cx="720" cy="368" r="6" fill="#7f8c8d" stroke="#bdc3c7" stroke-width="1"/>
+        <text x="710" y="372" text-anchor="end" fill="#e8eaed" font-size="12" font-family="monospace">GND</text>
+
+        <circle cx="720" cy="396" r="6" fill="#b388ff"/>
+        <text x="710" y="400" text-anchor="end" fill="#e8eaed" font-size="12" font-family="monospace">SDA</text>
+
+        <circle cx="720" cy="424" r="6" fill="#4dabf7"/>
+        <text x="710" y="428" text-anchor="end" fill="#e8eaed" font-size="12" font-family="monospace">SCK</text>
+
+        <circle cx="720" cy="452" r="6" fill="#1abc9c"/>
+        <text x="710" y="456" text-anchor="end" fill="#e8eaed" font-size="12" font-family="monospace">MISO</text>
+
+        <circle cx="720" cy="480" r="6" fill="#2ecc71"/>
+        <text x="710" y="484" text-anchor="end" fill="#e8eaed" font-size="12" font-family="monospace">MOSI</text>
+
+        <!-- IRQ pin (8th physical pin on RC522 module) — Not Connected, polling mode -->
+        <text x="710" y="494" text-anchor="end" fill="#5d7287" font-size="10" font-family="monospace" font-style="italic">IRQ (NC)</text>
+
+        <circle cx="720" cy="508" r="6" fill="#ecf0f1" stroke="#bdc3c7" stroke-width="1"/>
+        <text x="710" y="512" text-anchor="end" fill="#e8eaed" font-size="12" font-family="monospace">RST</text>
+
+      </g>
+
+      <!-- ============================================================
+           Slider B (BUILDING_PHASE)
+           pos: x=720..960, y=580..700
+           pins on LEFT edge (x=720)
+           ============================================================ -->
+      <g id="slider-b">
+        <rect x="720" y="580" width="240" height="120"
+              rx="8" fill="#1f6f5c" stroke="#36ad8d" stroke-width="2" filter="url(#shadow)"/>
+        <text x="840" y="610" text-anchor="middle" fill="#e8eaed" font-size="16" font-weight="600">Slider B</text>
+        <text x="840" y="628" text-anchor="middle" fill="#a8e0d2" font-size="11">DollaTek 10K &middot; BUILDING_PHASE</text>
+        <rect x="760" y="650" width="160" height="14" rx="7" fill="#0f4035" stroke="#36ad8d" stroke-width="1"/>
+        <rect x="820" y="646" width="20" height="22" rx="3" fill="#e8eaed" stroke="#36ad8d" stroke-width="1"/>
+
+        <!-- Pins on LEFT edge -->
+        <circle cx="720" cy="610" r="6" fill="#e74c3c"/>
+        <text x="710" y="614" text-anchor="end" fill="#e8eaed" font-size="12" font-family="monospace">VCC</text>
+
+        <circle cx="720" cy="640" r="6" fill="#f1c40f"/>
+        <text x="710" y="644" text-anchor="end" fill="#e8eaed" font-size="12" font-family="monospace">Wiper</text>
+
+        <circle cx="720" cy="670" r="6" fill="#7f8c8d" stroke="#bdc3c7" stroke-width="1"/>
+        <text x="710" y="674" text-anchor="end" fill="#e8eaed" font-size="12" font-family="monospace">GND</text>
+      </g>
+
+      <!-- ============================================================
+           WIRES — from ESP32 right edge (x=280) to peripherals left edge (x=720)
+           ============================================================ -->
+
+      <!-- 3V3 power: branches into 3 destinations (Slider A VCC 130, RC522 3.3V 340, Slider B VCC 610) -->
+      <path d="M 280 240 L 470 240 L 470 130 L 720 130" fill="none" stroke="#e74c3c" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M 470 240 L 470 340 L 720 340" fill="none" stroke="#e74c3c" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M 470 340 L 470 610 L 720 610" fill="none" stroke="#e74c3c" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+      <!-- 3V3 junction dots -->
+      <circle cx="470" cy="240" r="4" fill="#e74c3c"/>
+      <circle cx="470" cy="340" r="4" fill="#e74c3c"/>
+      <circle cx="470" cy="610" r="4" fill="#e74c3c"/>
+
+      <!-- GND power: branches into 3 destinations (Slider A 190, RC522 GND 368, Slider B GND 670) -->
+      <path d="M 280 285 L 510 285 L 510 190 L 720 190" fill="none" stroke="#8d9197" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M 510 285 L 510 368 L 720 368" fill="none" stroke="#8d9197" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M 510 368 L 510 670 L 720 670" fill="none" stroke="#8d9197" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+      <!-- GND junction dots -->
+      <circle cx="510" cy="285" r="4" fill="#8d9197"/>
+      <circle cx="510" cy="368" r="4" fill="#8d9197"/>
+      <circle cx="510" cy="670" r="4" fill="#8d9197"/>
+
+      <!-- GPIO34 → Slider A Wiper (orange) -->
+      <path d="M 280 345 L 380 345 L 380 160 L 720 160" fill="none" stroke="#f39c12" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+
+      <!-- GPIO35 → Slider B Wiper (yellow) -->
+      <path d="M 280 390 L 410 390 L 410 640 L 720 640" fill="none" stroke="#f1c40f" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+
+      <!-- GPIO5 (SS) → RC522 SDA -->
+      <path d="M 280 450 L 555 450 L 555 396 L 720 396" fill="none" stroke="#b388ff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+
+      <!-- GPIO18 (SCK) → RC522 SCK -->
+      <path d="M 280 495 L 590 495 L 590 424 L 720 424" fill="none" stroke="#4dabf7" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+
+      <!-- GPIO19 (MISO) → RC522 MISO -->
+      <path d="M 280 540 L 625 540 L 625 452 L 720 452" fill="none" stroke="#1abc9c" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+
+      <!-- GPIO23 (MOSI) → RC522 MOSI -->
+      <path d="M 280 585 L 660 585 L 660 480 L 720 480" fill="none" stroke="#2ecc71" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+
+      <!-- GPIO27 (RST) → RC522 RST -->
+      <path d="M 280 640 L 690 640 L 690 508 L 720 508" fill="none" stroke="#ecf0f1" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+
+      <!-- ============================================================
+           Wire labels (subtle, near the corners)
+           ============================================================ -->
+      <g font-family="monospace" font-size="10" fill="#bcc1c8">
+        <text x="478" y="232">3V3 Rail</text>
+        <text x="518" y="277">GND Rail</text>
+      </g>
+
+    </svg>
+  </section>
+
+  <div class="info-grid">
+
+    <section class="card">
+      <h2>Legende &mdash; Kabelfarben</h2>
+      <table>
+        <thead>
+          <tr><th style="width:50px">Farbe</th><th>Signal</th><th>ESP32</th><th>Ziel</th></tr>
+        </thead>
+        <tbody>
+          <tr class="legend-row">
+            <td><span class="swatch" style="background:#e74c3c"></span></td>
+            <td class="mono">3V3 (rot)</td>
+            <td class="mono">3V3</td>
+            <td>alle VCC / 3.3V</td>
+          </tr>
+          <tr class="legend-row">
+            <td><span class="swatch" style="background:#8d9197"></span></td>
+            <td class="mono">GND (schwarz)</td>
+            <td class="mono">GND</td>
+            <td>alle GND</td>
+          </tr>
+          <tr class="legend-row">
+            <td><span class="swatch" style="background:#f39c12"></span></td>
+            <td class="mono">Analog A (orange)</td>
+            <td class="mono">GPIO 34</td>
+            <td>Slider A Wiper</td>
+          </tr>
+          <tr class="legend-row">
+            <td><span class="swatch" style="background:#f1c40f"></span></td>
+            <td class="mono">Analog B (gelb)</td>
+            <td class="mono">GPIO 35</td>
+            <td>Slider B Wiper</td>
+          </tr>
+          <tr class="legend-row">
+            <td><span class="swatch" style="background:#b388ff"></span></td>
+            <td class="mono">SS (lila)</td>
+            <td class="mono">GPIO 5</td>
+            <td>RC522 SDA</td>
+          </tr>
+          <tr class="legend-row">
+            <td><span class="swatch" style="background:#4dabf7"></span></td>
+            <td class="mono">SCK (blau)</td>
+            <td class="mono">GPIO 18</td>
+            <td>RC522 SCK</td>
+          </tr>
+          <tr class="legend-row">
+            <td><span class="swatch" style="background:#1abc9c"></span></td>
+            <td class="mono">MISO (türkis)</td>
+            <td class="mono">GPIO 19</td>
+            <td>RC522 MISO</td>
+          </tr>
+          <tr class="legend-row">
+            <td><span class="swatch" style="background:#2ecc71"></span></td>
+            <td class="mono">MOSI (grün)</td>
+            <td class="mono">GPIO 23</td>
+            <td>RC522 MOSI</td>
+          </tr>
+          <tr class="legend-row">
+            <td><span class="swatch" style="background:#ecf0f1; box-shadow:0 0 0 1px #888"></span></td>
+            <td class="mono">RST (weiß)</td>
+            <td class="mono">GPIO 27</td>
+            <td>RC522 RST</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section class="card">
+      <h2>Pin-Tabelle &mdash; alle Verbindungen</h2>
+      <table>
+        <thead>
+          <tr><th>ESP32 Pin</th><th>&rarr;</th><th>Modul</th><th>Modul-Pin</th></tr>
+        </thead>
+        <tbody>
+          <tr><td class="pin">3V3</td><td>&rarr;</td><td>RC522</td><td class="pin">3.3V</td></tr>
+          <tr><td class="pin">3V3</td><td>&rarr;</td><td>Slider A</td><td class="pin">VCC</td></tr>
+          <tr><td class="pin">3V3</td><td>&rarr;</td><td>Slider B</td><td class="pin">VCC</td></tr>
+          <tr><td class="pin">GND</td><td>&rarr;</td><td>RC522</td><td class="pin">GND</td></tr>
+          <tr><td class="pin">GND</td><td>&rarr;</td><td>Slider A</td><td class="pin">GND</td></tr>
+          <tr><td class="pin">GND</td><td>&rarr;</td><td>Slider B</td><td class="pin">GND</td></tr>
+          <tr><td class="pin">GPIO 5</td><td>&rarr;</td><td>RC522</td><td class="pin">SDA (SS)</td></tr>
+          <tr><td class="pin">GPIO 18</td><td>&rarr;</td><td>RC522</td><td class="pin">SCK</td></tr>
+          <tr><td class="pin">GPIO 19</td><td>&rarr;</td><td>RC522</td><td class="pin">MISO</td></tr>
+          <tr><td class="pin">GPIO 23</td><td>&rarr;</td><td>RC522</td><td class="pin">MOSI</td></tr>
+          <tr><td class="pin">GPIO 27</td><td>&rarr;</td><td>RC522</td><td class="pin">RST</td></tr>
+          <tr><td class="pin">GPIO 34</td><td>&rarr;</td><td>Slider A</td><td class="pin">Wiper (Mitte)</td></tr>
+          <tr><td class="pin">GPIO 35</td><td>&rarr;</td><td>Slider B</td><td class="pin">Wiper (Mitte)</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+  </div>
+
+  <section>
+    <h2>Wichtige Hinweise</h2>
+    <div class="notes-grid">
+
+      <div class="note note-warn">
+        <strong>RC522 STRIKT 3.3V</strong><br>
+        Niemals an 5V! Das RC522-Modul stirbt sofort. Versorgung kommt vom ESP32 3V3-Pin (NICHT VIN/5V).
+      </div>
+
+      <div class="note note-warn">
+        <strong>Wiper = mittlerer Pin</strong><br>
+        Bei beiden Slidern: der mittlere Pin ist das Schleifkontakt-Signal. Die zwei Außenpins sind VCC und GND &mdash; vertauschen invertiert nur die Slider-Richtung (kann TD-seitig per <code>1.0 - raw</code> gefixt werden).
+      </div>
+
+      <div class="note note-info">
+        <strong>Pin-Wahl: GPIO34 + GPIO35</strong><br>
+        Beide sind <em>input-only</em> auf ESP32 (ADC1, WiFi-safe). ADC2-Pins (z.&nbsp;B. GPIO0, 2, 4, 12&ndash;15) kollidieren mit WiFi und sind hier verboten.
+      </div>
+
+      <div class="note note-info">
+        <strong>Gemeinsamer 3V3/GND-Rail</strong><br>
+        Über Breadboard-Schienen werden 3V3 und GND einmal vom ESP32 abgegriffen und auf alle 3 Peripherie-Module verteilt. Spart Litzen, gleiche Referenzspannung.
+      </div>
+
+      <div class="note note-ok">
+        <strong>Kabellänge &lt; 30&nbsp;cm</strong><br>
+        Längere Strippen fangen 50/60&nbsp;Hz Netzbrumm. Bei Jitter trotz Median+EMA: 100&nbsp;nF Keramik-Kondensator Wiper&harr;GND als Anti-Aliasing einbauen.
+      </div>
+
+      <div class="note note-ok">
+        <strong>IRQ-Pin am RC522 = NC</strong><br>
+        Der IRQ-Pin am RC522 wird nicht verkabelt &mdash; die Firmware nutzt Polling (<code>PICC_IsNewCardPresent</code>), kein Interrupt.
+      </div>
+
+    </div>
+  </section>
+
+  <section>
+    <h2>Reihenfolge zum Verkabeln</h2>
+    <ol style="line-height:1.8;">
+      <li><strong>Strom AUS</strong> &mdash; USB nicht angeschlossen.</li>
+      <li><strong>Power-Rails</strong>: ESP32 3V3 &rarr; Breadboard-Plus-Rail (rot); ESP32 GND &rarr; Breadboard-Minus-Rail (schwarz).</li>
+      <li><strong>RC522</strong> verkabeln: 3.3V &rarr; Plus-Rail; GND &rarr; Minus-Rail; SDA&nbsp;&rarr;&nbsp;GPIO&nbsp;5; SCK&nbsp;&rarr;&nbsp;GPIO&nbsp;18; MISO&nbsp;&rarr;&nbsp;GPIO&nbsp;19; MOSI&nbsp;&rarr;&nbsp;GPIO&nbsp;23; RST&nbsp;&rarr;&nbsp;GPIO&nbsp;27.</li>
+      <li><strong>Slider A</strong>: VCC&nbsp;&rarr;&nbsp;Plus-Rail; GND&nbsp;&rarr;&nbsp;Minus-Rail; Wiper&nbsp;&rarr;&nbsp;GPIO&nbsp;34.</li>
+      <li><strong>Slider B</strong>: VCC&nbsp;&rarr;&nbsp;Plus-Rail; GND&nbsp;&rarr;&nbsp;Minus-Rail; Wiper&nbsp;&rarr;&nbsp;GPIO&nbsp;35.</li>
+      <li><strong>Sichtprüfung</strong>: keine Kurzschlüsse Plus-Rail&nbsp;&harr;&nbsp;Minus-Rail; Wiper-Pins NICHT an Plus oder Minus angeschlossen.</li>
+      <li><strong>USB anstecken</strong> und Sketch flashen (Arduino IDE 2.x, ESP32 Dev Module, 115200 Baud).</li>
+      <li><strong>Serial Monitor</strong>: <code>BOOT:rfid_reader_ready</code> &rarr; <code>HB:1</code> &rarr; <code>SLIDER:0.xxx</code> &rarr; <code>PSLIDER:0.xxx</code> ticken sollten erscheinen.</li>
+    </ol>
+  </section>
+
+  <footer>
+    Vollst&auml;ndige Lab-Procedure: <code>firmware/esp32-rfid/LAB-SETUP-GUIDE.md</code> &middot;
+    Sketch: <code>firmware/esp32-rfid/esp32_rfid/esp32_rfid.ino</code> &middot;
+    Plan: <code>.planning/phases/02.1-height-slider/02.1-01-firmware-slider-adc-PLAN.md</code>
+  </footer>
+
+</div>
+</body>
+</html>
