@@ -28,6 +28,7 @@ Reads from these TD nodes (must exist with these names):
 
 Colors and method names below must stay in sync with data/methods_db.json.
 """
+import json
 import math
 import numpy as np
 
@@ -226,6 +227,23 @@ def cook(scriptOp):
 
     hb_alive = _resolve_hb_alive(owner, hb)
 
+    # ----- Phase 02.1 Slider state (HEIGHT cap + BUILDING_PHASE override) -----
+    try:
+        floor_val = int(op("compute_state")["floor"][0])
+    except Exception:
+        floor_val = 1
+    floor_cap = _max_floors_for(method_id)
+    floor_over_cap = (floor_val > floor_cap)
+
+    try:
+        wrapper_state_val = int(op("compute_state")["wrapper_state"][0])
+    except Exception:
+        wrapper_state_val = 0
+    try:
+        phase_index_val = int(op("compute_state")["phase_index"][0])
+    except Exception:
+        phase_index_val = 1
+
     # ----- render -----
     img = np.zeros((PROJ_H, PROJ_W, 4), dtype=np.float32)
     _paint_background(img, accent)
@@ -256,6 +274,14 @@ def cook(scriptOp):
     # DISCONNECTED overlay — shown when vision pipeline is offline > 3 s
     if hb_alive == 0:
         _draw_disconnected(img)
+
+    # Phase 02.1 — Floor-cap INVALID overlay (Slider A exceeds method's max_floors)
+    if floor_over_cap:
+        _draw_floor_cap_invalid(img, floor_val, floor_cap)
+
+    # Phase 02.1 — Manual-Override indicator (Slider B moved within last 10 s)
+    if wrapper_state_val == 1:
+        _draw_manual_override(img, phase_index_val)
 
     scriptOp.copyNumpyArray(img)
 
@@ -291,6 +317,76 @@ def _resolve_hb_alive(owner, heartbeat):
         return int(op("compute_state")["hb_alive"][0])
     except Exception:
         return 1 if heartbeat >= 0 else 0
+
+
+def _max_floors_for(method_id):
+    """Read methods_db.json[method_id].max_floors via the in-network Text DAT.
+
+    Returns 5 as a safe default if the DAT is missing or the field is absent.
+    Phase 02.1 — see data/methods_db.json and CONTEXT.md.
+    """
+    try:
+        db_dat = op("methods_db")
+        if db_dat is None:
+            return 5
+        database = json.loads(db_dat.text)
+        for method in database.get("methods", []):
+            if int(method.get("id", -1)) == int(method_id):
+                return int(method.get("max_floors", 5))
+    except Exception:
+        pass
+    return 5
+
+
+def _draw_floor_cap_invalid(img, floor_val, floor_cap):
+    """Red border + diagonal X over the method_selection panel when floor > max_floors.
+
+    Phase 02.1 — see .planning/phases/02.1-height-slider/02.1-CONTEXT.md (Slider A cap).
+    Visual mirrors the DISCONNECTED feedback language so the operator gets immediate
+    feedback that the slider exceeds the active method's allowed floor count.
+    """
+    bx, by, bw, bh = _panel_bounds("method_selection")
+    red = (0.85, 0.15, 0.15, 1.0)
+    border = 4
+    for off in range(border):
+        _line(img, bx + off,             by + off,             bx + bw - 1 - off, by + off,             red, 1)
+        _line(img, bx + off,             by + bh - 1 - off,    bx + bw - 1 - off, by + bh - 1 - off,    red, 1)
+        _line(img, bx + off,             by + off,             bx + off,           by + bh - 1 - off,   red, 1)
+        _line(img, bx + bw - 1 - off,    by + off,             bx + bw - 1 - off, by + bh - 1 - off,    red, 1)
+    cx = bx + bw // 2
+    cy = by + bh // 2
+    size = min(bw, bh) // 3
+    _line(img, cx - size, cy - size, cx + size, cy + size, red, 4)
+    _line(img, cx + size, cy - size, cx - size, cy + size, red, 4)
+
+
+def _draw_manual_override(img, phase_index_val):
+    """Orange dashed border around the method_selection panel when MANUAL_OVERRIDE is active.
+
+    Phase 02.1 — see CONTEXT.md Slider B amendment. Triggered by Slider B movement.
+    The wrapper auto-times-out after PHASE_OVERRIDE_FRAMES (~10 s @ 30 fps) of
+    Slider B inactivity. Orange (not red) so operators can distinguish "you are
+    overriding the phase" from the floor-cap "you exceeded the cap" red.
+    """
+    bx, by, bw, bh = _panel_bounds("method_selection")
+    orange = (1.0, 0.55, 0.05, 1.0)
+    border = 3
+    dash_on = 12
+    dash_off = 6
+    for off in range(border):
+        x = bx
+        while x < bx + bw:
+            x_end = min(x + dash_on, bx + bw - 1)
+            _line(img, x, by + off,             x_end, by + off,             orange, 1)
+            _line(img, x, by + bh - 1 - off,    x_end, by + bh - 1 - off,    orange, 1)
+            x += dash_on + dash_off
+    for off in range(border):
+        y = by
+        while y < by + bh:
+            y_end = min(y + dash_on, by + bh - 1)
+            _line(img, bx + off,             y, bx + off,             y_end, orange, 1)
+            _line(img, bx + bw - 1 - off,    y, bx + bw - 1 - off,    y_end, orange, 1)
+            y += dash_on + dash_off
 
 
 def _panel_accent(accent_rgb, panel_id):

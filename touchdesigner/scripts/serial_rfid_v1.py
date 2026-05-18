@@ -90,6 +90,45 @@ def onReceive(dat, rowIndex, message, bytes):
     if "HB:" in line:
         return
 
+    # PSLIDER MUST be tested BEFORE SLIDER — `"SLIDER:" in "PSLIDER:0.5"` returns True
+    # (substring match at index 1). Reversed order would mis-route Slider B values
+    # into Slider A storage. See .planning/phases/02.1-height-slider/02.1-CONTEXT.md.
+    if "PSLIDER:" in line:
+        start = line.index("PSLIDER:") + 8
+        raw = line[start:].strip()
+        try:
+            value = float(raw)
+        except ValueError:
+            print(f"[serial_rfid] dropped malformed PSLIDER line: {line!r}")
+            return
+        dat.store("phase_slider_raw", value)
+        dat.store("phase_slider_last_frame", absTime.frame)
+        return
+
+    if "SLIDER:" in line:
+        start = line.index("SLIDER:") + 7
+        raw = line[start:].strip()
+        try:
+            value = float(raw)
+        except ValueError:
+            print(f"[serial_rfid] dropped malformed SLIDER line: {line!r}")
+            return
+        dat.store("slider_raw", value)
+        dat.store("slider_last_frame", absTime.frame)
+        return
+
+    if "FLOOR:" in line:
+        start = line.index("FLOOR:") + 6
+        raw = line[start:].strip()
+        try:
+            value = int(raw)
+        except ValueError:
+            print(f"[serial_rfid] dropped malformed FLOOR line: {line!r}")
+            return
+        dat.store("floor", value)
+        print(f"[serial_rfid] floor={value}")
+        return
+
     if line:
         print(f"[serial_rfid] raw: {line!r}")
 
@@ -97,8 +136,18 @@ def onReceive(dat, rowIndex, message, bytes):
 def onConnect(dat):
     print(f"[serial_rfid] connected on {dat.par.port.val}")
     dat.store("method_id", 0)
+    dat.store("floor", 1)
+    dat.store("slider_raw", 0.0)
+    dat.store("slider_last_frame", -1)
+    dat.store("phase_slider_raw", 0.0)
+    dat.store("phase_slider_last_frame", -1)
 
 
 def onDisconnect(dat):
     print("[serial_rfid] disconnected - method_id reset to 0")
     dat.store("method_id", 0)
+    dat.store("floor", 1)
+    dat.store("slider_raw", 0.0)
+    dat.store("slider_last_frame", -1)
+    dat.store("phase_slider_raw", 0.0)
+    dat.store("phase_slider_last_frame", -1)

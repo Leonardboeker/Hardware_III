@@ -3,11 +3,18 @@
 Drop-in upgrade for state_chop_v1.py when the richer vision/FSM channels are
 available from the OSC bridge.
 """
+import json
 import math
 
 FOOTPRINT_IDS = list(range(10))
 LIVENESS_FRAMES = 10
 HB_TIMEOUT_TICKS = 90
+
+# Phase 02.1 Slider integration — see .planning/phases/02.1-height-slider/02.1-CONTEXT.md
+SLIDER_TIMEOUT_TICKS = 60       # frames of silence on SLIDER:/PSLIDER: before *_alive → 0 (~2s @ 30 fps)
+PHASE_OVERRIDE_FRAMES = 300     # 10 s @ 30 fps — wrapper_state stays MANUAL_OVERRIDE this long
+PHASE_OVERRIDE_THRESHOLD = 0.05 # raw value delta to trigger override (5 % travel)
+PHASE_HYST_EPSILON = 0.02       # TD-side hysteresis nudge for phase_index quantization
 
 _TABLE_W_M = 0.9
 _TABLE_H_M = 0.6
@@ -19,6 +26,12 @@ _last_hb_value = -1
 _last_hb_frame = -1
 _last_synced_method_id = None
 _last_synced_hb_alive = None
+
+# Phase-slider state (persists between cooks) — Slider B (BUILDING_PHASE) amendment
+_last_phase_slider_value = -1.0     # last raw value seen, for movement detection
+_last_phase_index = 1               # last quantized phase
+_last_phase_center = 0.0            # for TD-side hysteresis
+_manual_override_until_frame = -1   # me.time.frame at which override expires
 
 METHOD_STATE = {
     0: {"current_method": None, "selected_material": None, "current_phase_name": None},
@@ -61,6 +74,15 @@ def cook(scriptOp):
         "gesture_dwell",
         "gesture_action",
         "fsm_state",
+        # --- Phase 02.1 Slider A (HEIGHT) ---
+        "floor",
+        "slider_raw",
+        "slider_alive",
+        # --- Phase 02.1 Slider B (BUILDING_PHASE, Manual-Override-Only) ---
+        "phase_slider_raw",
+        "phase_index",
+        "phase_slider_alive",
+        "wrapper_state",
     ):
         scriptOp.appendChan(channel_name)
 
@@ -104,8 +126,8 @@ def cook(scriptOp):
     except Exception:
         pass
 
+    rfid = op("rfid_in")
     if method_id < 0:
-        rfid = op("rfid_in")
         if rfid is not None:
             try:
                 method_id = int(rfid["method_id"][0])
@@ -116,6 +138,81 @@ def cook(scriptOp):
                     pass
         if method_id < 0:
             method_id = 0
+
+    # --- Slider A (HEIGHT) — read from Serial DAT storage ---
+    floor_val = 1
+    slider_raw_val = 0.0
+    slider_alive = 0
+    if rfid is not None:
+        try:
+            floor_val = int(rfid.fetch("floor", 1))
+        except Exception:
+            pass
+        try:
+            slider_raw_val = float(rfid.fetch("slider_raw", 0.0))
+        except Exception:
+            pass
+        try:
+            slider_last = int(rfid.fetch("slider_last_frame", -1))
+            if slider_last >= 0 and (me.time.frame - slider_last) < SLIDER_TIMEOUT_TICKS:
+                slider_alive = 1
+        except Exception:
+            pass
+
+    # --- Slider B (BUILDING_PHASE, Manual-Override-Only) — read + TD-side quantization ---
+    global _last_phase_slider_value, _last_phase_index, _last_phase_center, _manual_override_until_frame
+    phase_slider_raw_val = 0.0
+    phase_slider_alive = 0
+    if rfid is not None:
+        try:
+            phase_slider_raw_val = float(rfid.fetch("phase_slider_raw", 0.0))
+        except Exception:
+            pass
+        try:
+            phase_last = int(rfid.fetch("phase_slider_last_frame", -1))
+            if phase_last >= 0 and (me.time.frame - phase_last) < SLIDER_TIMEOUT_TICKS:
+                phase_slider_alive = 1
+        except Exception:
+            pass
+
+    # Per-method n_phases from methods_db Text DAT (inline parse — methods_db is small)
+    n_phases = 5
+    try:
+        db_dat = op("methods_db")
+        if db_dat is not None:
+            database = json.loads(db_dat.text)
+            for method in database.get("methods", []):
+                if int(method.get("id", -1)) == method_id:
+                    n_phases = max(1, int(method.get("n_phases", 5)))
+                    break
+    except Exception:
+        pass
+
+    # Movement detection → MANUAL_OVERRIDE wrapper_state for PHASE_OVERRIDE_FRAMES
+    if _last_phase_slider_value < 0.0:
+        _last_phase_slider_value = phase_slider_raw_val
+        _last_phase_center = 0.0
+        _last_phase_index = 1
+    if abs(phase_slider_raw_val - _last_phase_slider_value) > PHASE_OVERRIDE_THRESHOLD:
+        _manual_override_until_frame = me.time.frame + PHASE_OVERRIDE_FRAMES
+        _last_phase_slider_value = phase_slider_raw_val
+
+    wrapper_state_val = 1 if me.time.frame < _manual_override_until_frame else 0
+
+    # Per-method phase_index quantization with TD-side hysteresis
+    if n_phases <= 1:
+        phase_index_val = 1
+    else:
+        half_step = 1.0 / (2.0 * (n_phases - 1))
+        if abs(phase_slider_raw_val - _last_phase_center) > (half_step + PHASE_HYST_EPSILON):
+            new_index = 1 + int(round(phase_slider_raw_val * (n_phases - 1)))
+            if new_index < 1:
+                new_index = 1
+            if new_index > n_phases:
+                new_index = n_phases
+            _last_phase_index = new_index
+            _last_phase_center = float(new_index - 1) / float(n_phases - 1)
+        phase_index_val = _last_phase_index
 
     scriptOp["puck_count"][0] = len(pucks)
     scriptOp["area_px2"][0] = area
@@ -130,6 +227,16 @@ def cook(scriptOp):
     scriptOp["gesture_dwell"][0] = _float_chan(vision, "gesture/dwell:0")
     scriptOp["gesture_action"][0] = _int_chan(vision, "gesture/action:0")
     scriptOp["fsm_state"][0] = _int_chan(vision, "fsm/state:0")
+
+    # --- Phase 02.1 Slider outputs ---
+    scriptOp["floor"][0] = floor_val
+    scriptOp["slider_raw"][0] = slider_raw_val
+    scriptOp["slider_alive"][0] = slider_alive
+    scriptOp["phase_slider_raw"][0] = phase_slider_raw_val
+    scriptOp["phase_index"][0] = phase_index_val
+    scriptOp["phase_slider_alive"][0] = phase_slider_alive
+    scriptOp["wrapper_state"][0] = wrapper_state_val
+
     _sync_owner_state(scriptOp, method_id, hb_alive)
 
 
