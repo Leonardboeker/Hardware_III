@@ -187,10 +187,10 @@
       </div>
 
       <div class="slide-body reveal-stagger">
-        <div class="left-half" style="display:grid; gap: var(--s-body);">
-          <h2 class="h2 lowercase">a table that reads<br/>your configuration,<br/>and projects its<br/>consequences</h2>
+        <div class="left-half" style="display:grid; gap: var(--s-snug);">
+          <h2 class="h2 lowercase" style="font-size: clamp(1.5rem, 1.0rem + 1.8vw, 2.4rem); line-height: 1.0;">a table that reads<br/>your configuration,<br/>and projects its consequences</h2>
 
-          <ul class="bare">
+          <ul class="bare" style="font-size: clamp(0.78rem, 0.7rem + 0.3vw, 0.95rem); line-height: 1.4;">
             <li>Place a physical method model on the RFID pedestal to choose the construction method.</li>
             <li>Set the working plane with four ArUco corner markers on the table.</li>
             <li>Dwell a red puck three seconds at each point to draw the footprint polygon, projection responds live.</li>
@@ -580,7 +580,7 @@
               <rect x="40" y="60" width="220" height="100" class="stroke-1-5 fill-paper" />
               <text x="56" y="88" class="label-lg">vision_in</text>
               <text x="56" y="110" class="label-md">OSC In CHOP</text>
-              <text x="56" y="128" class="label-sm">puck positions + heartbeat from CV</text>
+              <text x="56" y="128" class="label-sm">puck positions + heartbeat</text>
             </g>
 
             <!-- rfid_in -->
@@ -619,10 +619,10 @@
 
             <!-- projector_out -->
             <g>
-              <rect x="960" y="170" width="120" height="120" class="stroke-1-5 fill-paper" />
-              <text x="976" y="200" class="label-lg">projector_out</text>
-              <text x="976" y="222" class="label-md">Window COMP</text>
-              <text x="976" y="244" class="label-sm">full screen output</text>
+              <rect x="900" y="170" width="180" height="120" class="stroke-1-5 fill-paper" />
+              <text x="916" y="200" class="label-lg">projector_out</text>
+              <text x="916" y="222" class="label-md">Window COMP</text>
+              <text x="916" y="244" class="label-sm">full screen output</text>
             </g>
 
             <!-- Lines -->
@@ -635,10 +635,10 @@
               <polygon points="700,106 706,110 700,114" fill="currentColor" stroke="none"/>
               <path d="M 610 260 L 700 350" />
               <polygon points="700,346 706,350 700,354" fill="currentColor" stroke="none"/>
-              <path d="M 920 110 L 960 200" />
-              <polygon points="960,196 966,200 960,204" fill="currentColor" stroke="none"/>
-              <path d="M 920 350 L 960 260" />
-              <polygon points="960,256 966,260 960,264" fill="currentColor" stroke="none"/>
+              <path d="M 920 110 L 900 200" />
+              <polygon points="900,196 906,200 900,204" fill="currentColor" stroke="none"/>
+              <path d="M 920 350 L 900 260" />
+              <polygon points="900,256 906,260 900,264" fill="currentColor" stroke="none"/>
             </g>
           </svg>
         </div>
@@ -943,7 +943,7 @@
             <!-- Panel texts -->
             <rect x="270" y="200" width="700" height="56" class="stroke-1-5 fill-paper" />
             <text x="286" y="226" class="label-lg">9 projection panels</text>
-            <text x="286" y="244" class="label-sm">text_top_phase_navigation · text_left_info · text_right_comparison · text_right_cost_chart · text_right_phase_preview · ...</text>
+            <text x="286" y="244" class="label-sm">text_top_phase_navigation · text_left_info · text_right_comparison · ...</text>
 
             <g class="stroke-1-5">
               <path d="M 220 100 L 270 100" /><polygon points="266,96 274,100 266,104" fill="currentColor" stroke="none"/>
