@@ -798,6 +798,27 @@ def quantity_for_basis(
         return gfa, None
     if basis in {"per_m2_wall", "hours_per_m2_wall", "eur_per_m2_wall", "days_per_m2_wall"}:
         return gfa * wall_to_gfa_ratio, None
+    if basis in {
+        "per_m2_roof_area",
+        "hours_per_m2_roof_area",
+        "eur_per_m2_roof_area",
+        "days_per_m2_roof_area",
+    }:
+        return footprint_area, None
+    if basis in {
+        "per_m2_opening_area",
+        "hours_per_m2_opening_area",
+        "eur_per_m2_opening_area",
+        "days_per_m2_opening_area",
+    }:
+        return gfa, None
+    if basis in {
+        "per_m2_finished_surface",
+        "hours_per_m2_finished_surface",
+        "eur_per_m2_finished_surface",
+        "days_per_m2_finished_surface",
+    }:
+        return gfa * wall_to_gfa_ratio, None
     if basis == "per_m3":
         wall_area = gfa * wall_to_gfa_ratio
         return wall_area * thickness, None

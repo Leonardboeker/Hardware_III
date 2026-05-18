@@ -1,202 +1,239 @@
 # TouchDesigner Framework Setup Guide
 
-Build this network in `vertical-slice.toe`.  
-TD build: **2025.32050** — do not upgrade mid-project.
+Build this network in `vertical-slice.toe`.
+Recommended TD build: `2025.32050`.
 
----
+This guide reflects the current shared direction:
+- 9-panel projection layout
+- `render_footprint` as the single final Script TOP
+- normalized `metrics_engine`
+- `ui_state` as the panel-text bridge
 
-## Node naming convention
+## Fastest Path
 
-Names describe **what the node does**, not its operator type:
+If you want the network scaffold created automatically inside TouchDesigner:
+
+1. Add a Text DAT named `bootstrap_metric_ui`
+2. Paste [touchdesigner/scripts/metric_ui_bootstrap.py](/o:/Hardware_III/touchdesigner/scripts/metric_ui_bootstrap.py)
+3. Turn `Module` ON
+4. Run:
+
+```python
+op("bootstrap_metric_ui").module.bootstrap_metric_ui()
+```
+
+Optional demo seed:
+
+```python
+op("bootstrap_metric_ui").module.seed_demo_state()
+```
+
+That creates the main nodes, text panels, callback DATs, and the `refresh_metrics_ui`
+helper DAT. The rest of this guide describes the same network manually.
+
+## Core Nodes
 
 | Node name | Type | Role |
 |-----------|------|------|
-| `vision_in`        | OSC In CHOP    | OSC data from OpenCV pipeline (puck positions + heartbeat) |
-| `rfid_in`          | Constant CHOP (stub) → Serial DAT (real) | construction method selector |
-| `compute_state`    | Script CHOP    | aggregates puck_count, area, method_id, hb_alive |
-| `render_footprint` | Script TOP     | renders the 1280×720 projection image |
-| `stats_text`       | Text TOP       | text overlay (Pucks / Area / Status) |
-| `compose_final`    | Over TOP       | merges render_footprint + stats_text |
-| `projector_out`    | Window COMP    | sends image to the projector |
-
----
+| `vision_in` | OSC In CHOP | live CV / OSC data |
+| `rfid_in` | Constant CHOP now, Serial DAT later | method selection |
+| `compute_state` | Script CHOP | aggregates area, heartbeat, method id |
+| `render_footprint` | Script TOP | draws the 9-panel layout and auto-blits panel text |
+| `metrics_engine` | Text DAT, Module ON | computes `metrics_output` |
+| `ui_state` | Text DAT, Module ON | converts `metrics_output` into panel text strings |
+| `lca_data` | Script DAT | exposes `methods_db.json` rows inside TD |
+| `text_<panel_id>` | Text TOP | optional text overlay per panel |
+| `projector_out` | Window COMP | sends the final frame to the projector |
 
 ## Architecture
 
+```text
+vision_in ----.
+              +--> compute_state -------------------------------.
+rfid_in -----'                                               |
+                                                              |
+metrics_engine (DAT module) ---> owner storage: metrics_output |
+ui_state      (DAT module) ---> owner storage: text_*         |
+                                                              v
+text_<panel_id> TOPs -------------------------------> render_footprint -> projector_out
 ```
-vision_in ─────────┐
-                   ├──► compute_state ──► render_footprint ──┐
-rfid_in   ─────────┘                                         ├──► compose_final ──► projector_out
-                              │                              │
-                              └──► stats_text ───────────────┘
-```
 
----
+`render_footprint` is the final image. No `compose_final` and no Over TOP are needed.
 
-## Step 0 — Clean up old nodes
+## Step 0 - Clean Up Old Nodes
 
-Delete (right-click → Delete):
-- `script1`, `script2`, `script3` (and their `_callbacks` DATs)
-- `text1`, `over1`, `over2`, `transform1`
-- `select1`, `storage`
-- `disconnected`, `pending`, `invalid`, `valid` (FSM color blocks)
+Delete old one-off nodes if they are still present:
+- `compose_final`
+- `stats_text`
+- old `text1`, `over1`, `over2`, `transform1`
+- unused `script1`, `script2`, `script3`
 
-Keep: `cam` (we'll rename it), `window1` (we'll rename it).
+Keep the actual inputs if they already exist and rename them into the names below.
 
----
+## Step 1 - `vision_in` (OSC In CHOP)
 
-## Step 1 — `vision_in` (OSC In CHOP)
+Rename your OSC input node to `vision_in`.
 
-You already have this as `cam`. **Rename** it:
-- Double-click the name label `cam` → type `vision_in` → Enter
+Recommended settings:
+- `Protocol`: `UDP`
+- `Port`: `7000`
+- `Active`: `On`
 
-Verify settings:
-| Parameter | Value |
-|-----------|-------|
-| Protocol | UDP |
-| Port | 7000 |
-| Active | On |
+## Step 2 - `rfid_in`
 
----
+For now use a Constant CHOP:
+1. Add `CHOP -> Constant`
+2. Rename it to `rfid_in`
+3. Create channel `method_id`
+4. Set its value to `0`
 
-## Step 2 — `rfid_in` (stub: Constant CHOP)
+Later, when the ESP32 reader is ready, replace this with a Serial DAT and paste
+`touchdesigner/scripts/serial_rfid_v1.py` into the callbacks.
 
-For now, fake the RFID input with a Constant CHOP. Later we replace it with a real Serial DAT when the ESP32 hardware is built.
+## Step 3 - `compute_state` (Script CHOP)
 
-1. **Add → CHOP → Constant**
-2. Rename to `rfid_in`
-3. In parameters → **Channel 0**:
-   - **Name**: `method_id`
-   - **Value**: `0`
-
-To test methods later, manually change Value to 1, 2, 3, or 4 — the visualization will update its color.
-
----
-
-## Step 3 — `compute_state` (Script CHOP)
-
-1. **Add → CHOP → Script**
+1. Add `CHOP -> Script`
 2. Rename to `compute_state`
-3. Right-click → **Edit Script** → paste contents of [`touchdesigner/scripts/state_chop_v1.py`](scripts/state_chop_v1.py)
-4. Parameters → **Cook Type** → Every Frame
+3. Paste [touchdesigner/scripts/state_chop_v1.py](/o:/Hardware_III/touchdesigner/scripts/state_chop_v1.py)
+4. Set `Cook Type` to `Every Frame`
 
-Outputs 4 channels: `puck_count`, `area_px2`, `method_id`, `hb_alive`
+This outputs:
+- `puck_count`
+- `area_px2`
+- `area_m2`
+- `method_id`
+- `hb_alive`
 
-> Reads `op('vision_in')` and `op('rfid_in')` by name — make sure both exist.
+If the richer OSC payload is available later, you can swap in
+[touchdesigner/scripts/vision2_state_chop.py](/o:/Hardware_III/touchdesigner/scripts/vision2_state_chop.py)
+instead.
 
----
+## Step 4 - `lca_data` (Script DAT)
 
-## Step 4 — `render_footprint` (Script TOP)
+1. Add `DAT -> Script`
+2. Rename to `lca_data`
+3. Paste [touchdesigner/scripts/lca_data_reader.py](/o:/Hardware_III/touchdesigner/scripts/lca_data_reader.py)
+4. Pulse cook / keep it available in the network
 
-1. **Add → TOP → Script**
-2. Rename to `render_footprint`
-3. Right-click → **Edit Script** → paste contents of [`touchdesigner/scripts/footprint_viz_v5.py`](scripts/footprint_viz_v5.py)
-4. Parameters → **Common** → Resolution → **1280 × 720**
-5. Parameters → **Cook Type** → Every Frame
+This gives the TD network a live table view of `data/methods_db.json`.
 
-> Reads `op('vision_in')` and `op('compute_state')` by name.
+## Step 5 - `metrics_engine` (Text DAT, Module ON)
 
----
+1. Add `DAT -> Text`
+2. Rename to `metrics_engine`
+3. Paste [touchdesigner/scripts/metrics_engine.py](/o:/Hardware_III/touchdesigner/scripts/metrics_engine.py)
+4. Turn `Module` ON
 
-## Step 5 — `stats_text` (Text TOP)
+This module reads owner storage like `current_method`, `area_m2`,
+`number_of_floors`, and `current_phase_name`, then stores `metrics_output`.
 
-1. **Add → TOP → Text**
-2. Rename to `stats_text`
-3. Click the `=` button next to the **Text** parameter to switch to Expression mode
-4. Paste:
+## Step 6 - `ui_state` (Text DAT, Module ON)
+
+1. Add `DAT -> Text`
+2. Rename to `ui_state`
+3. Paste [touchdesigner/scripts/ui_state.py](/o:/Hardware_III/touchdesigner/scripts/ui_state.py)
+4. Turn `Module` ON
+
+After metrics recompute, call:
 
 ```python
-'Pucks: ' + str(int(op('compute_state')['puck_count'][0])) + '   Area: ' + str(int(op('compute_state')['area_px2'][0])) + ' px²   ' + ['OFFLINE','LIVE'][int(op('compute_state')['hb_alive'][0])]
+op("metrics_engine").module.compute_and_store_touchdesigner()
+op("ui_state").module.compute_and_store_touchdesigner_ui()
 ```
 
-5. Other params:
+That writes panel-facing storage keys such as:
+- `text_top_phase_navigation`
+- `text_left_info`
+- `text_left_assembly_sequence`
+- `text_method_selection`
+- `text_right_comparison`
+- `text_right_cost_chart`
+- `text_right_phase_preview`
+- `text_bar_bottom_status`
 
-| Parameter | Value |
-|-----------|-------|
-| Font Size | 28 |
-| Color | 1, 1, 1, 1 (white) |
-| Horizontal Align | Left |
-| Resolution | 1280 × 180 |
+## Step 7 - `render_footprint` (Script TOP)
 
----
+1. Add `TOP -> Script`
+2. Rename to `render_footprint`
+3. Paste [touchdesigner/scripts/footprint_viz_v5.py](/o:/Hardware_III/touchdesigner/scripts/footprint_viz_v5.py)
+4. Set resolution to `1280 x 720`
+5. Set `Cook Type` to `Every Frame`
 
-## Step 6 — `compose_final` (Over TOP)
+This script:
+- draws all 9 panels
+- draws the footprint polygon in the center panel
+- draws the method color block
+- draws heartbeat status
+- auto-composites any `Text TOP` named `text_<panel_id>`
 
-1. **Add → TOP → Over**
-2. Rename to `compose_final`
-3. Connect:
-   - Input 1: `render_footprint`
-   - Input 2: `stats_text`
-4. In Over parameters → **Translate** of Input 2:
-   - **ty** = `-270` (shifts the 180-px text strip to the bottom of the 720-px frame)
+## Step 8 - Add Text TOPs For Panels
 
----
+Create Text TOPs only for the panels you want populated immediately.
+At minimum, create:
+- `text_top_phase_navigation`
+- `text_left_info`
+- `text_left_assembly_sequence`
+- `text_method_selection`
+- `text_right_comparison`
+- `text_right_cost_chart`
+- `text_right_phase_preview`
+- `text_bar_bottom_status`
 
-## Step 7 — `projector_out` (Window COMP)
+Set each Text TOP's text expression to:
 
-Rename existing `window1` to `projector_out`. Connect:
-- `compose_final` → `projector_out`
-
-| Parameter | Value |
-|-----------|-------|
-| Resolution | 1280 × 720 |
-| Monitor | projector display index (or 0 for primary) |
-
-To preview without a projector: set **Open** → On in projector_out.
-
----
-
-## Final layout check
-
-```
-vision_in (OSC In CHOP, port 7000)
-rfid_in   (Constant CHOP, method_id = 0)
-                    │
-                    ▼
-            compute_state (Script CHOP)
-                    │
-        ┌───────────┴────────────┐
-        ▼                        ▼
-   render_footprint         stats_text
-   (Script TOP 1280×720)    (Text TOP, expression)
-        │                        │
-        └─────► compose_final ◄──┘
-                     │
-                     ▼
-              projector_out
-              (Window COMP)
+```python
+parent().fetch(me.name, "")
 ```
 
----
+Because each TOP is named `text_<panel_id>`, this expression makes the TOP read
+its matching storage value directly.
 
-## Testing without hardware
+Panel sizes and coordinates are listed in
+[touchdesigner/PANEL-LAYOUT-GUIDE.md](/o:/Hardware_III/touchdesigner/PANEL-LAYOUT-GUIDE.md).
 
-1. Run the vision pipeline:
-   ```bash
-   python -m vision.src.run_vertical_slice \
-     --camera 0 \
-     --intrinsics vision/calibration/synthetic_intrinsics.yml \
-     --homography vision/calibration/synthetic_homography.yml
-   ```
-2. Watch the puck markers move on the camera preview.
-3. In TD, change `rfid_in` → Channel 0 → Value (0–4) to switch construction methods. The polygon outline color in `render_footprint` should change.
+## Step 9 - `projector_out` (Window COMP)
 
----
+Rename your display window to `projector_out` and wire:
 
-## When the ESP32 + RFID hardware arrives
+```text
+render_footprint -> projector_out
+```
 
-Replace the `rfid_in` Constant CHOP with a Serial DAT:
-1. Delete `rfid_in` (the Constant CHOP)
-2. **Add → DAT → Serial**, rename to `rfid_in`
-3. Set **Port** = COM port, **Baud** = 115200, **Active** = On
-4. Right-click → **Edit Callbacks** → paste [`touchdesigner/scripts/serial_rfid_v1.py`](scripts/serial_rfid_v1.py)
-5. `compute_state` works with both — no script changes needed
+Recommended settings:
+- resolution `1280 x 720`
+- correct monitor index for the projector
 
----
+## First Local Test
 
-## Adding a new construction method
+Before the full control flow is wired, seed a few owner storage values manually:
 
-1. Add entry to [`data/methods_db.json`](../data/methods_db.json)
-2. Add color + name in `footprint_viz_v5.py` → `METHOD_COLORS` / `METHOD_NAMES`
-3. Add RFID tag mapping in `serial_rfid_v1.py` → `RFID_TO_METHOD` (only when hardware is in use)
-4. Re-paste updated scripts into `render_footprint` and `rfid_in` Script OPs in TD
+```python
+parent().store("current_method", "masonry")
+parent().store("area_m2", 42.0)
+parent().store("number_of_floors", 3)
+parent().store("current_phase_name", "structure")
+```
+
+Then run:
+
+```python
+op("metrics_engine").module.compute_and_store_touchdesigner()
+op("ui_state").module.compute_and_store_touchdesigner_ui()
+```
+
+Expected result:
+- panel texts appear in the correct 9-panel slots
+- bottom bar shows area / method / status
+- method panel shows the selected method
+- right-side cards show totals and active-stage values
+
+## When RFID Hardware Arrives
+
+Replace the Constant CHOP with a Serial DAT:
+1. Delete the Constant CHOP `rfid_in`
+2. Add `DAT -> Serial`
+3. Rename it to `rfid_in`
+4. Set the correct COM port and `115200` baud
+5. Paste [touchdesigner/scripts/serial_rfid_v1.py](/o:/Hardware_III/touchdesigner/scripts/serial_rfid_v1.py)
+
+No `compute_state` script change should be needed.
