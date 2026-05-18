@@ -33,6 +33,10 @@ _last_phase_index = 1               # last quantized phase
 _last_phase_center = 0.0            # for TD-side hysteresis
 _manual_override_until_frame = -1   # me.time.frame at which override expires
 
+# methods_db cache (avoid re-parsing JSON every cook — 30 Hz file I/O is expensive)
+_methods_db_cache = None
+_methods_db_text_hash = None
+
 METHOD_STATE = {
     0: {"current_method": None, "selected_material": None, "current_phase_name": None},
     1: {
@@ -88,27 +92,86 @@ def cook(scriptOp):
 
     vision = op("vision_in")
 
+    # Heartbeat - tolerate both 'vision/heartbeat' (single-arg) and 'vision/heartbeat:0'
     global _last_hb_value, _last_hb_frame
-    try:
-        hb = int(vision["vision/heartbeat:0"][0])
+    hb = -1
+    for hb_name in ("vision/heartbeat", "vision/heartbeat:0"):
+        try:
+            hb = int(vision[hb_name][0])
+            break
+        except Exception:
+            pass
+    if hb >= 0:
         td_frame = me.time.frame
         if hb != _last_hb_value:
             _last_hb_value = hb
             _last_hb_frame = td_frame
         hb_alive = 1 if (td_frame - _last_hb_frame) < HB_TIMEOUT_TICKS else 0
-    except Exception:
-        hb = -1
+    else:
         hb_alive = 0
 
-    pucks = {}
-    for pid in FOOTPRINT_IDS:
+    # Puck channel naming auto-detection. Elias's main.py uses flat-1-indexed:
+    #   /puck/<id> arg0 arg1 arg2  -> channels puck/<id>1, puck/<id>2, puck/<id>3
+    # Older builds may use colon: puck/<id>:0, puck/<id>:1, puck/<id>:2
+    # Or flat-0: puck/<id>0, puck/<id>1, puck/<id>2
+    import re as _re
+    _puck_re_flat1 = _re.compile(r'^puck/(\d+)1$')
+    _puck_re_colon = _re.compile(r'^puck/(\d+):0$')
+    _puck_re_flat0 = _re.compile(r'^puck/(\d+)0$')
+
+    chan_names = [c.name for c in vision.chans('*')]
+    puck_ids_flat1 = set()
+    puck_ids_colon = set()
+    puck_ids_flat0 = set()
+    for name in chan_names:
+        m = _puck_re_flat1.match(name)
+        if m and not name.endswith(':0'):
+            puck_ids_flat1.add(int(m.group(1)))
+            continue
+        m = _puck_re_colon.match(name)
+        if m:
+            puck_ids_colon.add(int(m.group(1)))
+            continue
+        m = _puck_re_flat0.match(name)
+        if m:
+            puck_ids_flat0.add(int(m.group(1)))
+
+    # Pick the mode that found the most puck IDs
+    if len(puck_ids_flat1) >= len(puck_ids_colon) and len(puck_ids_flat1) >= len(puck_ids_flat0):
+        puck_mode = 'flat1'
+        puck_ids = sorted(puck_ids_flat1)
+    elif len(puck_ids_colon) >= len(puck_ids_flat0):
+        puck_mode = 'colon'
+        puck_ids = sorted(puck_ids_colon)
+    else:
+        puck_mode = 'flat0'
+        puck_ids = sorted(puck_ids_flat0)
+
+    def _puck_arg(pid, idx):
+        """Read arg idx (0-based) for puck pid. 0=frame, 1=x, 2=y."""
+        if puck_mode == 'flat1':
+            name = f'puck/{pid}{idx + 1}'
+        elif puck_mode == 'colon':
+            name = f'puck/{pid}:{idx}'
+        else:  # flat0
+            name = f'puck/{pid}{idx}'
         try:
-            pf = int(vision[f"puck/{pid}:0"][0])
+            return vision[name][0]
+        except Exception:
+            return None
+
+    pucks = {}
+    for pid in puck_ids:
+        try:
+            pf_raw = _puck_arg(pid, 0)
+            if pf_raw is None:
+                continue
+            pf = int(pf_raw)
             if hb >= 0 and abs(hb - pf) <= LIVENESS_FRAMES:
-                pucks[pid] = (
-                    float(vision[f"puck/{pid}:1"][0]),
-                    float(vision[f"puck/{pid}:2"][0]),
-                )
+                px = _puck_arg(pid, 1)
+                py = _puck_arg(pid, 2)
+                if px is not None and py is not None:
+                    pucks[pid] = (float(px), float(py))
         except Exception:
             pass
 
@@ -175,16 +238,22 @@ def cook(scriptOp):
         except Exception:
             pass
 
-    # Per-method n_phases from methods_db Text DAT (inline parse — methods_db is small)
+    # Per-method n_phases from methods_db Text DAT, cached by content-hash
+    # (avoid re-parsing JSON every cook — methods_db rarely changes at runtime)
+    global _methods_db_cache, _methods_db_text_hash
     n_phases = 5
     try:
         db_dat = op("methods_db")
         if db_dat is not None:
-            database = json.loads(db_dat.text)
-            for method in database.get("methods", []):
-                if int(method.get("id", -1)) == method_id:
-                    n_phases = max(1, int(method.get("n_phases", 5)))
-                    break
+            cur_hash = hash(db_dat.text)
+            if cur_hash != _methods_db_text_hash:
+                _methods_db_cache = json.loads(db_dat.text)
+                _methods_db_text_hash = cur_hash
+            if _methods_db_cache is not None:
+                for method in _methods_db_cache.get("methods", []):
+                    if int(method.get("id", -1)) == method_id:
+                        n_phases = max(1, int(method.get("n_phases", 5)))
+                        break
     except Exception:
         pass
 
@@ -249,17 +318,25 @@ def _shoelace(points):
 
 
 def _int_chan(op_node, channel, default=0):
-    try:
-        return int(op_node[channel][0])
-    except Exception:
-        return default
+    """Read int channel. Tolerates both 'name' and 'name:0' (single-arg vs multi-arg OSC)."""
+    bare = channel.rsplit(':', 1)[0] if channel.endswith(':0') else channel
+    for cand in (channel, bare):
+        try:
+            return int(op_node[cand][0])
+        except Exception:
+            pass
+    return default
 
 
 def _float_chan(op_node, channel, default=0.0):
-    try:
-        return float(op_node[channel][0])
-    except Exception:
-        return default
+    """Read float channel. Tolerates both 'name' and 'name:0'."""
+    bare = channel.rsplit(':', 1)[0] if channel.endswith(':0') else channel
+    for cand in (channel, bare):
+        try:
+            return float(op_node[cand][0])
+        except Exception:
+            pass
+    return default
 
 
 def _sync_owner_state(scriptOp, method_id, hb_alive):
