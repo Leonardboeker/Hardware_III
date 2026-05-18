@@ -1,4 +1,4 @@
-"""Panel layout renderer — Script TOP.
+﻿"""Panel layout renderer — Script TOP.
 
 Renders the 9-panel UI from Panel_Ui.pdf at 1280×720 (TD Non-Commercial limit).
 
