@@ -81,6 +81,11 @@ static inline uint16_t sliderMedian() {
 void setup() {
   Serial.begin(115200);
   while (!Serial && millis() < 2000) {}  // wait briefly for USB CDC
+  // Slider ADC: 0..3.3 V full range
+  analogSetPinAttenuation(SLIDER_PIN, ADC_11db);
+  analogReadResolution(12);              // 0..4095 raw if we ever need raw; we use millivolts API
+  lastSliderPollMs = millis();
+  lastSliderEmitMs = millis();
   SPI.begin();
   rfid.PCD_Init();
   Serial.println("BOOT:rfid_reader_ready");
@@ -94,6 +99,58 @@ void loop() {
     lastHb = now;
     Serial.print("HB:");
     Serial.println(now / 1000);
+  }
+
+  // ---- Slider poll (every SLIDER_POLL_MS ms) ----
+  if (now - lastSliderPollMs >= SLIDER_POLL_MS) {
+    lastSliderPollMs = now;
+
+    // 1) Sample ADC in millivolts (calibrated by ESP32 core).
+    uint32_t mv = analogReadMilliVolts(SLIDER_PIN);
+    if (mv > (uint32_t)SLIDER_MV_MAX) mv = (uint32_t)SLIDER_MV_MAX;
+
+    // 2) Push into ring buffer.
+    sliderBuf[sliderBufHead] = (uint16_t)mv;
+    sliderBufHead = (sliderBufHead + 1) % MEDIAN_WINDOW;
+    if (sliderBufCount < MEDIAN_WINDOW) sliderBufCount++;
+
+    // 3) Median FIRST (kills single-tick spikes).
+    uint16_t med_mv = sliderMedian();
+    float    med_norm = (float)med_mv / SLIDER_MV_MAX;
+    if (med_norm < 0.0f) med_norm = 0.0f;
+    if (med_norm > 1.0f) med_norm = 1.0f;
+
+    // 4) EMA SECOND (smooths the post-median signal).
+    //    On the very first valid sample, seed EMA to med_norm so we don't ramp from 0.
+    static bool emaSeeded = false;
+    if (!emaSeeded) {
+      sliderEma = med_norm;
+      lastFloor = quantizeFloor(sliderEma);
+      lastFloorCenter = floorCenter(lastFloor);
+      emaSeeded = true;
+    } else {
+      sliderEma = (EMA_ALPHA * med_norm) + ((1.0f - EMA_ALPHA) * sliderEma);
+    }
+
+    // 5) Hysteresis-gated quantization. Floor only changes when the smoothed value has
+    //    moved more than half a floor-step away from the current floor's centre, plus EPSILON.
+    const float halfStep = (MAX_FLOORS > 1)
+      ? (1.0f / (2.0f * (float)(MAX_FLOORS - 1)))
+      : 0.5f;
+    if (fabsf(sliderEma - lastFloorCenter) > (halfStep + HYST_EPSILON)) {
+      uint8_t newFloor = quantizeFloor(sliderEma);
+      if (newFloor != lastFloor) {
+        lastFloor = newFloor;
+        lastFloorCenter = floorCenter(lastFloor);
+        Serial.printf("FLOOR:%u\n", (unsigned)lastFloor);
+      }
+    }
+  }
+
+  // ---- Slider periodic emit (every SLIDER_EMIT_MS ms) ----
+  if (now - lastSliderEmitMs >= SLIDER_EMIT_MS) {
+    lastSliderEmitMs = now;
+    Serial.printf("SLIDER:%.3f\n", sliderEma);
   }
 
   if (!rfid.PICC_IsNewCardPresent()) return;
