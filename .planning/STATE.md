@@ -20,6 +20,8 @@ See: `.planning/PROJECT.md` (updated 2026-05-03)
 **Core value:** Working interactive prototype where projection guides closed-loop comparative assembly in real time, with LCA data — including methodology wobble — overlaid per phase.
 **Current focus:** Phase 02.1 — Height Slider Integration
 
+> **⚡ Latest session snapshot:** [`SESSION-SNAPSHOT-2026-05-18.md`](SESSION-SNAPSHOT-2026-05-18.md) — full end-to-end demo path verified live (RFID + Slider A + Slider B + Vision pipeline all flowing into compute_state). Recovery procedures + known issues documented. **Read this first** if resuming work on Phase 02.1.
+
 **Canonical state model:** `IDLE -> METHOD -> FOOTPRINT -> HEIGHT -> MATERIALS -> VALIDATED -> PHASE_N -> COMPARISON`
 **State layering:** wrapper states and visual feedback states are tracked separately from the canonical content FSM.
 
