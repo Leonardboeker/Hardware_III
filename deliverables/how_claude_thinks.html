@@ -1,0 +1,546 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>How Claude Thinks</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,200;0,9..144,700;0,9..144,900;1,9..144,300&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#070A14;--sur:#0C1022;--bdr:#1A2240;--txt:#E2E8F4;--mut:#5A6890;--cy:#00D4FF;--am:#F4A72A;--pu:#A855F7;--gr:#22C55E;}
+*{margin:0;padding:0;box-sizing:border-box;}
+html{scroll-behavior:smooth;}
+body{background:var(--bg);color:var(--txt);font-family:'JetBrains Mono',monospace;overflow-x:hidden;}
+
+.hero{position:relative;height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;overflow:hidden;}
+#hc{position:absolute;inset:0;opacity:.45;}
+.hcon{position:relative;z-index:1;padding:2rem;}
+.hlbl{font-size:11px;letter-spacing:.35em;color:var(--cy);text-transform:uppercase;margin-bottom:1.5rem;}
+.htit{font-family:'Fraunces',serif;font-size:clamp(3.5rem,9vw,8rem);font-weight:900;line-height:.92;margin-bottom:1.75rem;background:linear-gradient(135deg,#fff 0%,var(--cy) 55%,var(--am) 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;}
+.hsub{font-size:13px;color:var(--mut);max-width:480px;margin:0 auto 3rem;line-height:1.9;}
+.scroll-h{font-size:11px;letter-spacing:.25em;color:var(--mut);text-transform:uppercase;animation:bob 2.2s ease-in-out infinite;}
+@keyframes bob{0%,100%{transform:translateY(0);opacity:.4;}50%{transform:translateY(8px);opacity:1;}}
+
+section{max-width:920px;margin:0 auto;padding:6rem 2rem;border-bottom:1px solid var(--bdr);}
+.snum{font-size:11px;letter-spacing:.35em;color:var(--cy);text-transform:uppercase;margin-bottom:.4rem;}
+.stit{font-family:'Fraunces',serif;font-size:clamp(2rem,5vw,3.8rem);font-weight:700;line-height:1.05;margin-bottom:1.5rem;}
+.sbod{font-size:13px;line-height:2;color:#8FA0C0;max-width:680px;margin-bottom:2rem;}
+
+.card{background:var(--sur);border:1px solid var(--bdr);border-radius:12px;padding:2rem;}
+.formula{background:var(--sur);border:1px solid var(--bdr);border-radius:8px;padding:1rem 1.5rem;margin:1.5rem 0;font-size:14px;color:var(--am);text-align:center;letter-spacing:.05em;}
+.callout{border-left:3px solid var(--am);padding:1rem 1.5rem;background:rgba(244,167,42,.05);border-radius:0 8px 8px 0;margin:1.5rem 0;font-size:13px;line-height:1.85;color:#C8A97A;}
+
+.btn{font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:.12em;padding:.65rem 1.4rem;border:1px solid var(--cy);border-radius:6px;background:transparent;color:var(--cy);cursor:pointer;text-transform:uppercase;transition:all .2s;white-space:nowrap;}
+.btn:hover{background:rgba(0,212,255,.1);box-shadow:0 0 20px rgba(0,212,255,.15);}
+.btn:disabled{opacity:.4;cursor:default;}
+
+.slrow{display:flex;flex-direction:column;gap:5px;margin-bottom:1rem;}
+.sllbl{display:flex;justify-content:space-between;font-size:11px;color:var(--mut);}
+.sllbl span:last-child{color:var(--txt);}
+input[type=range]{width:100%;-webkit-appearance:none;height:2px;background:var(--bdr);border-radius:2px;outline:none;}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:13px;height:13px;border-radius:50%;background:var(--cy);cursor:pointer;box-shadow:0 0 8px var(--cy);}
+
+.nlay{display:grid;grid-template-columns:220px 1fr;gap:2rem;align-items:center;}
+@media(max-width:620px){.nlay{grid-template-columns:1fr;}}
+.nglbl{font-size:10px;letter-spacing:.25em;text-transform:uppercase;margin-bottom:.6rem;margin-top:1rem;}
+
+.cnnlay{display:grid;grid-template-columns:1fr auto 1fr;gap:2rem;align-items:center;}
+@media(max-width:620px){.cnnlay{grid-template-columns:1fr;}}
+.glbl{font-size:10px;letter-spacing:.2em;color:var(--mut);margin-bottom:6px;text-transform:uppercase;}
+.pgrid{display:grid;gap:3px;}
+.px{border-radius:2px;transition:outline .1s;}
+
+.tokrow{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:2rem;}
+.tok{font-family:'Fraunces',serif;font-size:1.35rem;font-weight:600;padding:6px 14px;border:1px solid var(--bdr);border-radius:6px;background:var(--sur);color:var(--txt);cursor:pointer;transition:all .2s;}
+.tok:hover{border-color:var(--cy);}
+.tok.act{border-color:var(--cy);background:rgba(0,212,255,.1);color:var(--cy);}
+.bwrap{display:flex;gap:8px;height:90px;align-items:flex-end;}
+.bcol{flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;height:100%;justify-content:flex-end;}
+.abar{width:100%;border-radius:3px 3px 0 0;transition:height .45s cubic-bezier(.34,1.56,.64,1),background .3s;min-height:2px;}
+.bword{font-size:9px;color:var(--mut);text-align:center;}
+.anote{margin-top:1rem;font-size:12px;color:var(--mut);font-style:italic;min-height:1.5em;line-height:1.7;}
+
+.scltbl{display:flex;flex-direction:column;gap:1.1rem;}
+.sclrow{display:grid;grid-template-columns:160px 1fr 170px;gap:1rem;align-items:center;font-size:12px;}
+@media(max-width:620px){.sclrow{grid-template-columns:90px 1fr 90px;font-size:10px;}}
+.sclbg{height:18px;background:var(--bdr);border-radius:3px;overflow:hidden;}
+.sclfill{height:100%;border-radius:3px;width:0%;transition:width 1.2s cubic-bezier(.16,1,.3,1);}
+
+.steps{display:grid;grid-template-columns:repeat(3,1fr);gap:1.5rem;text-align:center;}
+@media(max-width:620px){.steps{grid-template-columns:1fr;}}
+.snum2{font-family:'Fraunces',serif;font-size:2.5rem;margin-bottom:.5rem;}
+.snm{font-size:12px;color:var(--txt);margin-bottom:.5rem;}
+.sds{font-size:11px;color:var(--mut);line-height:1.75;}
+
+footer{text-align:center;padding:3rem 2rem;font-size:10px;color:var(--mut);letter-spacing:.25em;text-transform:uppercase;}
+</style>
+</head>
+<body>
+
+<!-- HERO -->
+<div class="hero">
+  <canvas id="hc"></canvas>
+  <div class="hcon">
+    <div class="hlbl">An interactive explainer</div>
+    <h1 class="htit">How<br>Claude<br>Thinks</h1>
+    <p class="hsub">From a single artificial neuron to hundreds of billions of parameters — a visual journey through the mathematics of modern AI.</p>
+    <div class="scroll-h">↓ scroll to explore ↓</div>
+  </div>
+</div>
+
+<!-- 01 NEURON -->
+<section>
+  <div class="snum">01 — The Building Block</div>
+  <h2 class="stit">The Artificial Neuron</h2>
+  <p class="sbod">Every neural network — from image classifiers to Claude — is built from the same primitive unit: the artificial neuron. It takes several numbers as inputs, multiplies each by a learned <span style="color:var(--am)">weight</span>, sums them with a <span style="color:var(--pu)">bias</span>, then squashes the result through an <span style="color:var(--cy)">activation function</span> to decide how strongly to fire.</p>
+  <div class="formula">output = σ( w₁·x₁ + w₂·x₂ + w₃·x₃ + b )</div>
+  <p class="sbod">The weights and bias are what the network learns during training. Billions of tiny adjustments over trillions of examples add up to intelligence. Drag the sliders to see the neuron respond in real time.</p>
+
+  <div class="card">
+    <div class="nlay">
+      <div>
+        <div class="nglbl" style="color:var(--cy)">Inputs</div>
+        <div class="slrow"><div class="sllbl"><span>x₁</span><span id="lx1">1.0</span></div><input type="range" id="sx1" min="-2" max="2" step="0.1" value="1.0"></div>
+        <div class="slrow"><div class="sllbl"><span>x₂</span><span id="lx2">0.5</span></div><input type="range" id="sx2" min="-2" max="2" step="0.1" value="0.5"></div>
+        <div class="slrow"><div class="sllbl"><span>x₃</span><span id="lx3">−0.5</span></div><input type="range" id="sx3" min="-2" max="2" step="0.1" value="-0.5"></div>
+        <div class="nglbl" style="color:var(--am)">Weights (learned)</div>
+        <div class="slrow"><div class="sllbl"><span>w₁</span><span id="lw1">0.8</span></div><input type="range" id="sw1" min="-2" max="2" step="0.1" value="0.8"></div>
+        <div class="slrow"><div class="sllbl"><span>w₂</span><span id="lw2">0.5</span></div><input type="range" id="sw2" min="-2" max="2" step="0.1" value="0.5"></div>
+        <div class="slrow"><div class="sllbl"><span>w₃</span><span id="lw3">−0.3</span></div><input type="range" id="sw3" min="-2" max="2" step="0.1" value="-0.3"></div>
+        <div class="nglbl" style="color:var(--pu)">Bias</div>
+        <div class="slrow"><div class="sllbl"><span>b</span><span id="lb">0.1</span></div><input type="range" id="sb" min="-2" max="2" step="0.1" value="0.1"></div>
+        <div style="margin-top:1rem;padding-top:1rem;border-top:1px solid var(--bdr);font-size:11px;color:var(--mut);line-height:2.2;">
+          z &nbsp;= <span id="zv" style="color:var(--txt)">0.00</span><br>
+          σ(z) = <span id="sv" style="color:var(--cy);font-weight:700">0.50</span>
+        </div>
+      </div>
+      <canvas id="nc" style="width:100%;max-width:340px;display:block;margin:0 auto;"></canvas>
+    </div>
+  </div>
+</section>
+
+<!-- 02 DEEP NETWORKS -->
+<section>
+  <div class="snum">02 — Going Deep</div>
+  <h2 class="stit">Deep Neural Networks</h2>
+  <p class="sbod">Stack neurons into <span style="color:var(--cy)">layers</span>, connect the layers, and you get a deep neural network. Data flows forward: each layer transforms the representation, extracting increasingly abstract features. Early layers detect edges. Later layers detect concepts.</p>
+  <div class="callout">"Deep" just means many layers of transformations stacked in sequence. GPT-3 applies a learned transformation 96 times before producing any output. Claude applies it even more — across dozens of attention heads per layer.</div>
+
+  <div class="card">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;flex-wrap:wrap;gap:1rem;">
+      <div style="font-size:12px;color:var(--mut)">Watch a signal propagate forward through the layers</div>
+      <button class="btn" id="fwdbtn" onclick="runFwd()">Activate →</button>
+    </div>
+    <canvas id="ntc" style="width:100%;display:block;border-radius:6px;" height="260"></canvas>
+    <div style="display:flex;justify-content:space-around;margin-top:.75rem;font-size:9px;color:var(--mut);letter-spacing:.15em;text-transform:uppercase;">
+      <span>Input</span><span>Hidden 1</span><span>Hidden 2</span><span>Output</span>
+    </div>
+  </div>
+</section>
+
+<!-- 03 CNN -->
+<section>
+  <div class="snum">03 — Seeing Patterns</div>
+  <h2 class="stit">Convolutional Neural Networks</h2>
+  <p class="sbod">CNNs learn to see by sliding a small <span style="color:var(--cy)">filter</span> (a grid of learned weights) across an image, computing a dot product at each position. The filter learns to activate on specific patterns — an edge, a corner, a texture. Stack hundreds of these filters and the network builds a rich description of what it sees.</p>
+  <p class="sbod">Claude doesn't use CNNs — but the ideas of local pattern detection and hierarchical feature extraction are foundational to all deep learning. The filter below is a Sobel edge detector.</p>
+
+  <div class="card">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.5rem;flex-wrap:wrap;gap:1rem;">
+      <div style="font-size:12px;color:var(--mut)">A 3×3 filter slides over a 7×7 image pixel by pixel</div>
+      <button class="btn" id="cnnbtn" onclick="startConv()">Run Filter →</button>
+    </div>
+    <div class="cnnlay">
+      <div>
+        <div class="glbl">Input Image (7×7)</div>
+        <div id="igrid" class="pgrid" style="grid-template-columns:repeat(7,1fr);"></div>
+      </div>
+      <div style="text-align:center;">
+        <div class="glbl">Filter (3×3)</div>
+        <div id="fgrid" class="pgrid" style="grid-template-columns:repeat(3,1fr);width:84px;margin:0 auto;"></div>
+        <div style="margin-top:.75rem;font-size:11px;color:var(--mut);">sum =</div>
+        <div id="csum" style="font-size:1.4rem;color:var(--am);font-family:'Fraunces',serif;min-height:2rem;">—</div>
+      </div>
+      <div>
+        <div class="glbl">Output Map (5×5)</div>
+        <div id="ogrid" class="pgrid" style="grid-template-columns:repeat(5,1fr);"></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 04 ATTENTION -->
+<section>
+  <div class="snum">04 — The Revolution</div>
+  <h2 class="stit">Attention &amp; Transformers</h2>
+  <p class="sbod">In 2017, a paper called <span style="color:var(--cy)">"Attention is All You Need"</span> changed everything. Instead of reading left-to-right, the Transformer lets every word attend to every other word simultaneously — weighting how relevant each one is to the current word's meaning.</p>
+  <p class="sbod">When Claude reads "The bank by the river eroded", it uses attention to link "bank" to "river" (geography, not finance) and "eroded" to "bank" (what wore away). Claude does this across billions of parameters, dozens of attention heads, for every single token.</p>
+
+  <div class="card">
+    <div style="font-size:11px;color:var(--mut);margin-bottom:1rem;">Click a word — see which others it attends to most:</div>
+    <div class="tokrow" id="tokrow"></div>
+    <div style="font-size:10px;color:var(--mut);margin-bottom:.5rem;letter-spacing:.2em;text-transform:uppercase;">Attention weights</div>
+    <div class="bwrap" id="bwrap"></div>
+    <div style="display:flex;gap:8px;margin-top:4px;" id="blbls"></div>
+    <div class="anote" id="anote"></div>
+  </div>
+</section>
+
+<!-- 05 SCALE -->
+<section>
+  <div class="snum">05 — The Numbers</div>
+  <h2 class="stit">Parameters: The Scale of Claude</h2>
+  <p class="sbod">A <span style="color:var(--cy)">parameter</span> is a single learnable number — one synaptic weight in the network. Modern LLMs have hundreds of billions. Each is nudged, over trillions of training examples, until the network can predict what text comes next in any context.</p>
+  <div class="callout">Anthropic has not disclosed Claude's exact parameter count. Independent estimates place it between 500 billion and over 1 trillion — comparable to GPT-4. What is known: it was trained on hundreds of billions of tokens of text and refined with RLHF.</div>
+
+  <div class="card">
+    <div style="font-size:10px;color:var(--mut);letter-spacing:.2em;text-transform:uppercase;margin-bottom:1.5rem;">Parameter scale comparison</div>
+    <div class="scltbl" id="scltbl"></div>
+  </div>
+
+  <p class="sbod" style="margin-top:2rem;">For context: the human brain has ~86 billion neurons and an estimated <span style="color:var(--gr)">100 trillion synaptic connections</span>. A large LLM sits between those in raw count — but biological synapses are analog, dynamic, and run on 20 watts. Claude runs on megawatts of data-center power.</p>
+</section>
+
+<!-- 06 TRAINING -->
+<section style="border-bottom:none;">
+  <div class="snum">06 — How It Learned</div>
+  <h2 class="stit">Training: Making a Mind</h2>
+  <p class="sbod">The model starts with random weights — pure noise. It reads a sentence, predicts the next word, checks if it was right, then adjusts every parameter slightly via <span style="color:var(--cy)">gradient descent</span>. Repeat ~10²² times. The weights that survive are the ones that captured the patterns of human language and reasoning.</p>
+
+  <div class="card">
+    <div class="steps">
+      <div>
+        <div class="snum2" style="color:var(--cy)">01</div>
+        <div class="snm">Pre-training</div>
+        <div class="sds">Predict the next token. Billions of documents. Learns grammar, facts, logic, and world knowledge.</div>
+      </div>
+      <div>
+        <div class="snum2" style="color:var(--am)">02</div>
+        <div class="snm">Supervised Fine-tuning</div>
+        <div class="sds">Human-written example conversations teach the model how a helpful assistant should respond.</div>
+      </div>
+      <div>
+        <div class="snum2" style="color:var(--pu)">03</div>
+        <div class="snm">RLHF</div>
+        <div class="sds">Human raters score response pairs. The model learns to prefer answers that are helpful, harmless, and honest.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="callout" style="margin-top:2rem;">The result is a model with no memory between conversations, no live internet access by default, and no "understanding" in the human sense — but extraordinary pattern-matching across a vast compressed representation of human knowledge. That is Claude.</div>
+</section>
+
+<footer>Built for IAAC MRAC/MAAI 2026 &nbsp;·&nbsp; Vanilla JS + Canvas API &nbsp;·&nbsp; No frameworks</footer>
+
+<script>
+// ── HERO PARTICLE NETWORK ────────────────────────
+const HC = document.getElementById('hc');
+const Hx = HC.getContext('2d');
+let HP = [];
+function resizeH() {
+  HC.width = window.innerWidth; HC.height = window.innerHeight;
+  HP = Array.from({length:45}, () => ({
+    x: Math.random()*HC.width, y: Math.random()*HC.height,
+    vx:(Math.random()-.5)*.25, vy:(Math.random()-.5)*.25,
+    r:1.5+Math.random()*2.5, ph:Math.random()*Math.PI*2
+  }));
+}
+resizeH(); window.addEventListener('resize', resizeH);
+(function tickH() {
+  Hx.clearRect(0,0,HC.width,HC.height);
+  for(let i=0;i<HP.length;i++){
+    const a=HP[i]; a.x+=a.vx; a.y+=a.vy; a.ph+=.018;
+    if(a.x<0||a.x>HC.width)  a.vx*=-1;
+    if(a.y<0||a.y>HC.height) a.vy*=-1;
+    for(let j=i+1;j<HP.length;j++){
+      const b=HP[j], d=Math.hypot(a.x-b.x,a.y-b.y);
+      if(d<160){
+        Hx.beginPath(); Hx.moveTo(a.x,a.y); Hx.lineTo(b.x,b.y);
+        Hx.strokeStyle=`rgba(0,212,255,${(1-d/160)*.28})`; Hx.lineWidth=.6; Hx.stroke();
+      }
+    }
+    const g=.5+.5*Math.sin(a.ph);
+    Hx.beginPath(); Hx.arc(a.x,a.y,a.r,0,Math.PI*2);
+    Hx.fillStyle=`rgba(0,212,255,${.35+g*.5})`; Hx.fill();
+  }
+  requestAnimationFrame(tickH);
+})();
+
+// ── NEURON ────────────────────────────────────────
+const NC = document.getElementById('nc');
+const Nx = NC.getContext('2d');
+const sig = z => 1/(1+Math.exp(-z));
+
+function getN() {
+  const g = id => parseFloat(document.getElementById(id).value);
+  const x=[g('sx1'),g('sx2'),g('sx3')], w=[g('sw1'),g('sw2'),g('sw3')], b=g('sb');
+  const z=x.reduce((s,xi,i)=>s+xi*w[i],b);
+  return {x,w,b,z,s:sig(z)};
+}
+
+function drawN() {
+  const W=NC.clientWidth||340, H=300;
+  NC.width=W; NC.height=H;
+  const {x,w,z,s}=getN();
+  Nx.clearRect(0,0,W,H);
+  const cx=W*.62, cy=H/2, r=36, ix=18;
+  const iy=[H*.2,H*.5,H*.8];
+
+  for(let i=0;i<3;i++){
+    const st=Math.abs(w[i]), pos=w[i]>=0;
+    Nx.beginPath(); Nx.moveTo(ix+12,iy[i]); Nx.lineTo(cx-r,cy);
+    Nx.strokeStyle=pos?`rgba(0,212,255,${.2+st*.6})`:`rgba(244,167,42,${.2+st*.6})`;
+    Nx.lineWidth=.8+st*2.2; Nx.stroke();
+    const mx=(ix+12+cx-r)/2, my=(iy[i]+cy)/2;
+    Nx.fillStyle=pos?'#00D4FF':'#F4A72A';
+    Nx.font='9px JetBrains Mono'; Nx.textAlign='center';
+    Nx.fillText(w[i].toFixed(1),mx,my-5);
+  }
+  Nx.beginPath(); Nx.moveTo(cx+r,cy); Nx.lineTo(W-8,cy);
+  Nx.strokeStyle=`rgba(0,212,255,${.3+s*.65})`; Nx.lineWidth=1.5+s*3.5; Nx.stroke();
+
+  for(let i=0;i<3;i++){
+    const a=Math.abs(x[i])/2;
+    Nx.beginPath(); Nx.arc(ix,iy[i],10,0,Math.PI*2);
+    Nx.fillStyle=x[i]>=0?`rgba(0,212,255,${.35+a*.65})`:`rgba(244,167,42,${.35+a*.65})`; Nx.fill();
+    Nx.fillStyle='#0C1022'; Nx.font='bold 8px JetBrains Mono'; Nx.textAlign='center';
+    Nx.fillText('x'+(i+1),ix,iy[i]+3);
+  }
+  const grd=Nx.createRadialGradient(cx,cy,0,cx,cy,r+22);
+  grd.addColorStop(0,`rgba(0,212,255,${.08+s*.28})`); grd.addColorStop(1,'transparent');
+  Nx.beginPath(); Nx.arc(cx,cy,r+22,0,Math.PI*2); Nx.fillStyle=grd; Nx.fill();
+  Nx.beginPath(); Nx.arc(cx,cy,r,0,Math.PI*2);
+  Nx.fillStyle='#0C1022'; Nx.fill();
+  Nx.strokeStyle=`rgba(0,212,255,${.35+s*.65})`; Nx.lineWidth=2; Nx.stroke();
+  Nx.fillStyle=`rgba(0,212,255,${.6+s*.4})`;
+  Nx.font='bold 17px JetBrains Mono'; Nx.textAlign='center'; Nx.fillText('σ',cx,cy+6);
+  Nx.fillStyle='#00D4FF'; Nx.font='10px JetBrains Mono'; Nx.textAlign='right';
+  Nx.fillText(s.toFixed(3),W-4,cy-8);
+
+  document.getElementById('zv').textContent=z.toFixed(3);
+  document.getElementById('sv').textContent=s.toFixed(3);
+}
+
+const slMap={sx1:'lx1',sx2:'lx2',sx3:'lx3',sw1:'lw1',sw2:'lw2',sw3:'lw3',sb:'lb'};
+Object.keys(slMap).forEach(id=>{
+  document.getElementById(id).addEventListener('input',e=>{
+    const v=parseFloat(e.target.value);
+    document.getElementById(slMap[id]).textContent=(v<0?'−':'')+Math.abs(v).toFixed(1);
+    drawN();
+  });
+});
+drawN(); window.addEventListener('resize',drawN);
+
+// ── NETWORK FORWARD PASS ─────────────────────────
+const NTC=document.getElementById('ntc'); const NTx=NTC.getContext('2d');
+const LAYERS=[3,5,4,2]; let NN=[], NRun=false;
+
+function initNet(){
+  const W=NTC.clientWidth||600; NTC.width=W; NTC.height=260; NN=[];
+  const xs=LAYERS.map((_,i)=>60+i*((W-120)/(LAYERS.length-1)));
+  LAYERS.forEach((c,l)=>{
+    const lay=[];
+    for(let n=0;n<c;n++) lay.push({x:xs[l],y:130+(n-(c-1)/2)*46,act:0});
+    NN.push(lay);
+  });
+  renderNet(0);
+}
+
+function renderNet(lit){
+  const W=NTC.width,H=NTC.height; NTx.clearRect(0,0,W,H);
+  for(let l=0;l<NN.length-1;l++){
+    NN[l].forEach(a=>NN[l+1].forEach(b=>{
+      NTx.beginPath(); NTx.moveTo(a.x,a.y); NTx.lineTo(b.x,b.y);
+      NTx.strokeStyle=l<lit?'rgba(0,212,255,.18)':'rgba(255,255,255,.04)';
+      NTx.lineWidth=l<lit?.8:.4; NTx.stroke();
+    }));
+  }
+  NN.forEach(layer=>layer.forEach(n=>{
+    if(n.act>0){
+      const g=NTx.createRadialGradient(n.x,n.y,0,n.x,n.y,22);
+      g.addColorStop(0,`rgba(0,212,255,${n.act*.45})`); g.addColorStop(1,'transparent');
+      NTx.beginPath(); NTx.arc(n.x,n.y,22,0,Math.PI*2); NTx.fillStyle=g; NTx.fill();
+    }
+    NTx.beginPath(); NTx.arc(n.x,n.y,11,0,Math.PI*2);
+    NTx.fillStyle='#0C1022'; NTx.fill();
+    NTx.strokeStyle=n.act>0?`rgba(0,212,255,${.4+n.act*.6})`:'rgba(90,104,144,.35)';
+    NTx.lineWidth=n.act>0?2:1; NTx.stroke();
+    if(n.act>.5){NTx.beginPath();NTx.arc(n.x,n.y,4,0,Math.PI*2);NTx.fillStyle=`rgba(0,212,255,${n.act})`;NTx.fill();}
+  }));
+}
+
+function runFwd(){
+  if(NRun)return; NRun=true;
+  const btn=document.getElementById('fwdbtn'); btn.disabled=true; btn.textContent='Running…';
+  NN.forEach(l=>l.forEach(n=>n.act=0));
+  let li=0;
+  (function step(){
+    if(li>=NN.length){NRun=false;btn.disabled=false;btn.textContent='Activate →';
+      setTimeout(()=>{NN.forEach(l=>l.forEach(n=>n.act=0));renderNet(0);},1600);return;}
+    NN[li].forEach(n=>n.act=.4+Math.random()*.6);
+    renderNet(li+1); li++; setTimeout(step,480);
+  })();
+}
+window.addEventListener('resize',initNet); setTimeout(initNet,80);
+
+// ── CNN CONVOLUTION ───────────────────────────────
+const INP=[[20,22,200,210,205,28,20],[18,20,195,215,200,25,22],[22,200,210,218,208,200,20],[18,205,218,220,210,205,18],[20,22,200,215,200,22,20],[22,20,22,200,25,20,18],[20,18,20,22,20,18,22]];
+const FLT=[[-1,-2,-1],[0,0,0],[1,2,1]];
+let CR=false;
+
+function mkCell(w,h,bg,id){
+  const d=document.createElement('div'); d.className='px';
+  d.style.height=h+'px'; d.style.background=bg;
+  if(id) d.id=id; return d;
+}
+
+function buildCNN(){
+  const ig=document.getElementById('igrid');
+  const og=document.getElementById('ogrid');
+  const fg=document.getElementById('fgrid');
+  while(ig.firstChild)ig.removeChild(ig.firstChild);
+  while(og.firstChild)og.removeChild(og.firstChild);
+  while(fg.firstChild)fg.removeChild(fg.firstChild);
+  for(let r=0;r<7;r++) for(let c=0;c<7;c++){
+    const v=INP[r][c]; ig.appendChild(mkCell(26,26,`rgb(${v},${v},${v})`,`ip${r}${c}`));
+  }
+  for(let r=0;r<3;r++) for(let c=0;c<3;c++){
+    const v=FLT[r][c];
+    const bg=v>0?`rgba(0,212,255,${v*.5+.15})`:v<0?`rgba(244,167,42,${Math.abs(v)*.5+.15})`:'rgba(90,104,144,.25)';
+    fg.appendChild(mkCell(26,26,bg,null));
+  }
+  for(let r=0;r<5;r++) for(let c=0;c<5;c++){
+    og.appendChild(mkCell(26,26,'rgba(90,104,144,.15)',`op${r}${c}`));
+  }
+}
+
+async function startConv(){
+  if(CR)return; CR=true;
+  const btn=document.getElementById('cnnbtn'); btn.disabled=true; btn.textContent='Running…';
+  buildCNN();
+  const vals=[];
+  for(let r=0;r<5;r++) for(let c=0;c<5;c++){
+    let s=0;
+    for(let dr=0;dr<3;dr++) for(let dc=0;dc<3;dc++) s+=INP[r+dr][c+dc]*FLT[dr][dc];
+    vals.push(s);
+  }
+  const mx=Math.max(...vals.map(Math.abs))||1;
+  let i=0;
+  for(let r=0;r<5;r++) for(let c=0;c<5;c++){
+    for(let dr=0;dr<3;dr++) for(let dc=0;dc<3;dc++){
+      const el=document.getElementById(`ip${r+dr}${c+dc}`);
+      if(el) el.style.outline='2px solid #00D4FF';
+    }
+    const v=vals[i++];
+    document.getElementById('csum').textContent=v.toFixed(0);
+    await new Promise(res=>setTimeout(res,95));
+    for(let dr=0;dr<3;dr++) for(let dc=0;dc<3;dc++){
+      const el=document.getElementById(`ip${r+dr}${c+dc}`);
+      if(el) el.style.outline='none';
+    }
+    const n=v/mx;
+    const op=document.getElementById(`op${r}${c}`);
+    op.style.background=n>0?`rgba(0,212,255,${n*.9+.05})`:`rgba(244,167,42,${Math.abs(n)*.9+.05})`;
+  }
+  document.getElementById('csum').textContent='✓';
+  btn.disabled=false; btn.textContent='Run Filter →'; CR=false;
+}
+buildCNN();
+
+// ── ATTENTION DEMO ───────────────────────────────
+const WDS=['The','bank','by','the','river','eroded'];
+const ATW={
+  'The':   [.58,.05,.05,.12,.05,.15],
+  'bank':  [.04,.18,.08,.04,.50,.16],
+  'by':    [.08,.15,.14,.09,.34,.20],
+  'the':   [.52,.07,.07,.07,.09,.18],
+  'river': [.04,.32,.10,.04,.18,.32],
+  'eroded':[.04,.38,.09,.04,.24,.21]
+};
+const ANT={
+  'The':   '"The" attends mostly to itself and the noun phrase it introduces.',
+  'bank':  '"bank" attends heavily to "river" — context reveals it\'s geography, not finance.',
+  'by':    '"by" spreads attention broadly — a relational word linking the nouns around it.',
+  'the':   'The second "the" behaves like the first — articles track their noun phrases.',
+  'river': '"river" distributes attention to "bank" and "eroded" — anchoring the physical scene.',
+  'eroded':'"eroded" focuses on "bank" — the thing that got worn away.'
+};
+
+function buildAttn(){
+  const tr=document.getElementById('tokrow');
+  const bw=document.getElementById('bwrap');
+  const bl=document.getElementById('blbls');
+  while(tr.firstChild)tr.removeChild(tr.firstChild);
+  while(bw.firstChild)bw.removeChild(bw.firstChild);
+  while(bl.firstChild)bl.removeChild(bl.firstChild);
+
+  WDS.forEach(w=>{
+    const btn=document.createElement('button'); btn.className='tok';
+    btn.textContent=w; btn.onclick=()=>pickWord(w); tr.appendChild(btn);
+
+    const col=document.createElement('div'); col.className='bcol';
+    const bar=document.createElement('div'); bar.className='abar'; bar.id='ab'+w;
+    bar.style.height='2px'; bar.style.background='var(--cy)';
+    col.appendChild(bar); bw.appendChild(col);
+
+    const lbl=document.createElement('div'); lbl.className='bword';
+    lbl.style.flex='1'; lbl.textContent=w; bl.appendChild(lbl);
+  });
+}
+
+function pickWord(word){
+  document.querySelectorAll('.tok').forEach(b=>b.classList.toggle('act',b.textContent===word));
+  const wts=ATW[word];
+  WDS.forEach((wd,i)=>{
+    const bar=document.getElementById('ab'+wd); if(!bar)return;
+    bar.style.height=(wts[i]*100)+'%';
+    bar.style.background=wts[i]>.28?'var(--cy)':wts[i]>.1?'var(--am)':'rgba(90,104,144,.4)';
+  });
+  document.getElementById('anote').textContent=ANT[word]||'';
+}
+buildAttn(); setTimeout(()=>pickWord('bank'),400);
+
+// ── SCALE ────────────────────────────────────────
+const SCALE=[
+  {nm:'GPT-2',       yr:'2019',    lbl:'1.5 billion',       col:'#5A6890', pct:.4 },
+  {nm:'GPT-3',       yr:'2020',    lbl:'175 billion',        col:'#4FC3F7', pct:8  },
+  {nm:'LLaMA 3',     yr:'2024',    lbl:'405 billion',        col:'#A855F7', pct:18 },
+  {nm:'Claude',      yr:'2024–25', lbl:'~500B–1T+ (est.)',   col:'#00D4FF', pct:32 },
+  {nm:'GPT-4',       yr:'2023',    lbl:'~1 trillion (est.)', col:'#F4A72A', pct:43 },
+  {nm:'Human brain', yr:'biology', lbl:'~100T synapses',     col:'#22C55E', pct:100}
+];
+
+function buildScale(){
+  const t=document.getElementById('scltbl'); while(t.firstChild)t.removeChild(t.firstChild);
+  SCALE.forEach(d=>{
+    const row=document.createElement('div'); row.className='sclrow';
+
+    const nameCell=document.createElement('div');
+    const nm=document.createElement('div'); nm.style.color='var(--txt)'; nm.style.fontSize='12px'; nm.textContent=d.nm;
+    const yr=document.createElement('div'); yr.style.color='var(--mut)'; yr.style.fontSize='10px'; yr.textContent=d.yr;
+    nameCell.appendChild(nm); nameCell.appendChild(yr);
+
+    const barBg=document.createElement('div'); barBg.className='sclbg';
+    const fill=document.createElement('div'); fill.className='sclfill';
+    fill.dataset.pct=d.pct; fill.style.background=d.col;
+    barBg.appendChild(fill);
+
+    const val=document.createElement('div'); val.style.textAlign='right';
+    val.style.color=d.col; val.style.fontSize='11px'; val.textContent=d.lbl;
+
+    row.appendChild(nameCell); row.appendChild(barBg); row.appendChild(val);
+    t.appendChild(row);
+  });
+
+  new IntersectionObserver(entries=>{
+    if(entries[0].isIntersecting){
+      setTimeout(()=>{
+        document.querySelectorAll('.sclfill').forEach(b=>b.style.width=b.dataset.pct+'%');
+      },150);
+    }
+  },{threshold:.3}).observe(t);
+}
+buildScale();
+</script>
+</body>
+</html>
