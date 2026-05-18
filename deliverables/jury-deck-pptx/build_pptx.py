@@ -455,77 +455,107 @@ def slide_02_context_proposition(prs, video_path):
     s = new_slide(prs)
     add_kicker(s, 2, "Context", "the proposition")
 
-    # Left: video / poster
-    fig_x = MARGIN_X
-    fig_y = BODY_Y
-    fig_w = Inches(7.5)
-    fig_h = Inches(4.7)
-    # background panel
-    add_rect(s, fig_x, fig_y, fig_w, fig_h, fill=PAPER_EDGE, line=RULE, line_width=0.75)
-    if video_path and os.path.exists(video_path):
-        poster = os.path.join(os.path.dirname(os.path.abspath(__file__)),
-                              "assets", "demo_poster.jpg")
-        try:
-            kwargs = dict(mime_type="video/mp4")
-            if os.path.exists(poster):
-                kwargs["poster_frame_image"] = poster
-            s.shapes.add_movie(
-                video_path,
-                _i(fig_x + Inches(0.04)), _i(fig_y + Inches(0.04)),
-                _i(fig_w - Inches(0.08)), _i(fig_h - Inches(0.08)),
-                **kwargs,
-            )
-        except Exception as e:
-            add_text_box(
-                s, fig_x, fig_y, fig_w, fig_h,
-                f"[ video embed failed: {e} ]",
-                font=F_MONO, fallback=F_MONO_FALLBACK,
-                size=10, color=INK_FAINT, align=PP_ALIGN.CENTER, anchor=MSO_ANCHOR.MIDDLE,
-            )
-    else:
-        add_text_box(
-            s, fig_x, fig_y, fig_w, fig_h,
-            "[ demo video file missing ]",
-            font=F_MONO, fallback=F_MONO_FALLBACK,
-            size=10, color=INK_FAINT, align=PP_ALIGN.CENTER, anchor=MSO_ANCHOR.MIDDLE,
-        )
-    # Live pill bottom-left
-    pill_x = fig_x + Inches(0.2)
-    pill_y = fig_y + fig_h - Inches(0.5)
-    pill = s.shapes.add_shape(MSO_SHAPE.ROUNDED_RECTANGLE, pill_x, pill_y, Inches(1.9), Inches(0.32))
-    pill.fill.solid()
-    pill.fill.fore_color.rgb = PAPER
-    pill.line.color.rgb = RULE
-    pill.line.width = Pt(0.75)
-    pill.shadow.inherit = False
+    # Top row: heading + body
+    head_y = BODY_Y
+    head_h = Inches(1.6)
     add_text_box(
-        s, pill_x + Inches(0.18), pill_y, Inches(1.7), Inches(0.32),
-        "● LIVE · DETECTION DEMO",
-        font=F_MONO, fallback=F_MONO_FALLBACK,
-        size=7.5, color=INK, bold=True, letter_spacing=140,
-        anchor=MSO_ANCHOR.MIDDLE,
-    )
-
-    # Right column
-    rx = Inches(8.4)
-    rw = Inches(4.4)
-    add_text_box(
-        s, rx, BODY_Y, rw, Inches(1.9),
-        "a table\nthat reads\nyour building",
+        s, MARGIN_X, head_y, Inches(7.4), head_h,
+        "a table\nthat reads your building",
         font=F_DISPLAY, fallback=F_DISPLAY_FALLBACK,
-        size=34, bold=True, color=INK_STRONG, line_spacing=0.98,
+        size=30, bold=True, color=INK_STRONG, line_spacing=0.98,
     )
     add_text_box(
-        s, rx, BODY_Y + Inches(2.05), rw, Inches(2.0),
+        s, Inches(8.2), head_y + Inches(0.45), Inches(4.6), head_h,
         "An overhead short-throw projector returns visual feedback on a 9-panel layout. Configuration happens on the table itself. The system reads, computes, and shows the consequences live.",
         font=F_SANS, fallback=F_SANS_FALLBACK,
-        size=11, color=INK, line_spacing=1.5,
+        size=10, color=INK, line_spacing=1.5,
     )
-    add_spec(s, rx, BODY_Y + Inches(4.1), rw, [
-        ("Projection", "1280 x 720, short throw"),
-        ("Surface", "table-mounted"),
-        ("Loop", "closed via overhead webcam"),
-    ])
+
+    # Two video cards side by side
+    fig_y = head_y + head_h + Inches(0.15)
+    fig_h = Inches(4.1)
+    gap   = Inches(0.25)
+    total_w = SLIDE_W - 2 * MARGIN_X
+    fig_w = (total_w - gap) / 2
+
+    assets_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets")
+    video_dir  = os.path.dirname(video_path) if video_path else None
+
+    def add_video_card(x, swatch_rgb, label_text, video_filename, poster_filename):
+        add_rect(s, x, fig_y, fig_w, fig_h, fill=PAPER_EDGE, line=RULE, line_width=0.75)
+
+        vp = os.path.join(video_dir, video_filename) if video_dir else None
+        poster = os.path.join(assets_dir, poster_filename)
+
+        if vp and os.path.exists(vp):
+            try:
+                kwargs = dict(mime_type="video/mp4")
+                if os.path.exists(poster):
+                    kwargs["poster_frame_image"] = poster
+                s.shapes.add_movie(
+                    vp,
+                    _i(x + Inches(0.04)), _i(fig_y + Inches(0.04)),
+                    _i(fig_w - Inches(0.08)), _i(fig_h - Inches(0.08)),
+                    **kwargs,
+                )
+            except Exception as e:
+                add_text_box(
+                    s, x, fig_y, fig_w, fig_h,
+                    f"[ embed failed: {e} ]",
+                    font=F_MONO, fallback=F_MONO_FALLBACK,
+                    size=9, color=INK_FAINT, align=PP_ALIGN.CENTER, anchor=MSO_ANCHOR.MIDDLE,
+                )
+        else:
+            add_text_box(
+                s, x, fig_y, fig_w, fig_h,
+                f"[ {video_filename} missing ]",
+                font=F_MONO, fallback=F_MONO_FALLBACK,
+                size=9, color=INK_FAINT, align=PP_ALIGN.CENTER, anchor=MSO_ANCHOR.MIDDLE,
+            )
+
+        pill_x = x + Inches(0.18)
+        pill_y = fig_y + fig_h - Inches(0.46)
+        pill_w = Inches(2.5)
+        pill_h = Inches(0.32)
+        pill = s.shapes.add_shape(MSO_SHAPE.ROUNDED_RECTANGLE,
+                                  _i(pill_x), _i(pill_y), _i(pill_w), _i(pill_h))
+        pill.fill.solid()
+        pill.fill.fore_color.rgb = PAPER
+        pill.line.color.rgb = RULE
+        pill.line.width = Pt(0.75)
+        pill.shadow.inherit = False
+
+        sw_sz = Inches(0.10)
+        sw = s.shapes.add_shape(MSO_SHAPE.OVAL,
+                                _i(pill_x + Inches(0.14)),
+                                _i(pill_y + (pill_h - sw_sz) / 2),
+                                _i(sw_sz), _i(sw_sz))
+        sw.fill.solid()
+        sw.fill.fore_color.rgb = swatch_rgb
+        sw.line.fill.background()
+        sw.shadow.inherit = False
+        add_text_box(
+            s, pill_x + Inches(0.32), pill_y, pill_w - Inches(0.36), pill_h,
+            label_text.upper(),
+            font=F_MONO, fallback=F_MONO_FALLBACK,
+            size=7.5, color=INK, bold=True, letter_spacing=140,
+            anchor=MSO_ANCHOR.MIDDLE,
+        )
+
+    add_video_card(
+        x=MARGIN_X,
+        swatch_rgb=LIVE,
+        label_text="Detection · vision pipeline",
+        video_filename="demo_detection.mp4",
+        poster_filename="demo_poster.jpg",
+    )
+    add_video_card(
+        x=MARGIN_X + fig_w + gap,
+        swatch_rgb=PRINTED,
+        label_text="TouchDesigner · runtime",
+        video_filename="demo_touchdesigner.mp4",
+        poster_filename="td_poster.jpg",
+    )
 
     add_foot(s, 2, "Context")
     return s
