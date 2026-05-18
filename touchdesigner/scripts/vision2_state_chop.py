@@ -1,237 +1,308 @@
-"""vision2_state_chop.py — Script CHOP (drop-in upgrade for state_chop_v1.py).
+"""vision2_state_chop.py - Script CHOP.
 
-Paste into the `compute_state` Script CHOP in TouchDesigner.
-Cook Type: Every Frame.
-
-Reads from:
-  vision_in   OSC In CHOP  — all data from osc_bridge.py (port 7000)
-  rfid_in     Constant/Serial — physical RFID fallback for method_id
-              (kept for backward-compatibility; OSC method takes priority)
-
-Output channels  (all float, consumed by render_footprint and stats_text):
-
-  ── Backward-compatible (state_chop_v1.py) ──────────────────────────────
-  puck_count      int   active footprint points sent as pucks
-  area_px2        float shoelace area of the footprint polygon in proj px²
-  method_id       int   0=NONE  1=MASONRY  2=3D_PRINT  3=PREFAB
-  hb_alive        int   1 = pipeline alive, 0 = timed out / offline
-
-  ── Sketch state ─────────────────────────────────────────────────────────
-  sketch_points   int   footprint points placed
-  sketch_walls    int   wall segments (includes closing wall when ≥3 pts)
-  sketch_windows  int   windows added to walls
-  is_extruded     int   1 when 3-D extrusion is active
-
-  ── Gesture (puck + hand combined) ───────────────────────────────────────
-  gesture_id      int   0=none  1=puck  2=flat_fist  3=upright_fist
-                        4=index_only  5=peace  6=fist(ambiguous)
-  gesture_dwell   float seconds current gesture or puck has been held
-  gesture_action  int   0=none  1=place_point  2=add_window
-                        3=extrude  4=undo  5=reset  (pulses one cook)
-
-  ── FSM content state ─────────────────────────────────────────────────
-  fsm_state       int   0=IDLE 1=METHOD 2=FOOTPRINT 3=HEIGHT
-                        4=VALIDATED 5=PHASE_N
-
-Usage in expressions elsewhere in the TD network:
-  op('compute_state')['method_id'][0]
-  op('compute_state')['fsm_state'][0]
-  op('compute_state')['gesture_action'][0]
+Drop-in upgrade for state_chop_v1.py when the richer vision/FSM channels are
+available from the OSC bridge.
 """
-
+import json
 import math
 
-FOOTPRINT_IDS    = list(range(10))  # puck IDs 0-9 (sketch point slots)
-LIVENESS_FRAMES  = 10               # frame-count tolerance for puck freshness
-HB_TIMEOUT_TICKS = 90               # TD frames of silence before hb_alive → 0
-                                    # (≈3 s at 30 fps)
+FOOTPRINT_IDS = list(range(10))
+LIVENESS_FRAMES = 10
+HB_TIMEOUT_TICKS = 90
 
-# Physical table → projector calibration. Update before demo.
-# Defaults: 0.9 m × 0.6 m table, 1280×720 projector.
+# Phase 02.1 Slider integration — see .planning/phases/02.1-height-slider/02.1-CONTEXT.md
+SLIDER_TIMEOUT_TICKS = 60       # frames of silence on SLIDER:/PSLIDER: before *_alive → 0 (~2s @ 30 fps)
+PHASE_OVERRIDE_FRAMES = 300     # 10 s @ 30 fps — wrapper_state stays MANUAL_OVERRIDE this long
+PHASE_OVERRIDE_THRESHOLD = 0.05 # raw value delta to trigger override (5 % travel)
+PHASE_HYST_EPSILON = 0.02       # TD-side hysteresis nudge for phase_index quantization
+
 _TABLE_W_M = 0.9
 _TABLE_H_M = 0.6
-_PROJ_W    = 1280
-_PROJ_H    = 720
+_PROJ_W = 1280
+_PROJ_H = 720
 _PX2_TO_M2 = (_TABLE_W_M / _PROJ_W) * (_TABLE_H_M / _PROJ_H)
 
-# Heartbeat staleness tracking — persists between cooks at module level
 _last_hb_value = -1
 _last_hb_frame = -1
+_last_synced_method_id = None
+_last_synced_hb_alive = None
+
+# Phase-slider state (persists between cooks) — Slider B (BUILDING_PHASE) amendment
+_last_phase_slider_value = -1.0     # last raw value seen, for movement detection
+_last_phase_index = 1               # last quantized phase
+_last_phase_center = 0.0            # for TD-side hysteresis
+_manual_override_until_frame = -1   # me.time.frame at which override expires
+
+METHOD_STATE = {
+    0: {"current_method": None, "selected_material": None, "current_phase_name": None},
+    1: {
+        "current_method": "masonry",
+        "selected_material": "fired_clay_brick",
+        "current_phase_name": "foundation",
+    },
+    2: {
+        "current_method": "3d_printed",
+        "selected_material": "printed_concrete_or_earth_proxy",
+        "current_phase_name": "foundation",
+    },
+    3: {
+        "current_method": "prefab",
+        "selected_material": "timber_clt_prefab",
+        "current_phase_name": "A1-A3",
+    },
+    4: {
+        "current_method": "reclaimed_brick",
+        "selected_material": "reclaimed_fired_clay_brick",
+        "current_phase_name": "foundation",
+    },
+}
 
 
 def cook(scriptOp):
     scriptOp.clear()
-
-    # ── Declare all output channels ───────────────────────────────────────────
-    for ch in (
-        'puck_count', 'area_px2', 'area_m2', 'method_id', 'hb_alive',
-        'sketch_points', 'sketch_walls', 'sketch_windows', 'is_extruded',
-        'gesture_id', 'gesture_dwell', 'gesture_action',
-        'fsm_state',
+    for channel_name in (
+        "puck_count",
+        "area_px2",
+        "area_m2",
+        "method_id",
+        "hb_alive",
+        "sketch_points",
+        "sketch_walls",
+        "sketch_windows",
+        "is_extruded",
+        "gesture_id",
+        "gesture_dwell",
+        "gesture_action",
+        "fsm_state",
+        # --- Phase 02.1 Slider A (HEIGHT) ---
+        "floor",
+        "slider_raw",
+        "slider_alive",
+        # --- Phase 02.1 Slider B (BUILDING_PHASE, Manual-Override-Only) ---
+        "phase_slider_raw",
+        "phase_index",
+        "phase_slider_alive",
+        "wrapper_state",
     ):
-        scriptOp.appendChan(ch)
+        scriptOp.appendChan(channel_name)
 
-    vision = op('vision_in')
+    vision = op("vision_in")
 
-    # ── Heartbeat / liveness ──────────────────────────────────────────────────
-    # hb_alive only goes 1 when the heartbeat counter is actively advancing.
-    # A stale value (pipeline frozen or disconnected) times out after
-    # HB_TIMEOUT_TICKS TD frames (~3 s at 30 fps).
     global _last_hb_value, _last_hb_frame
-    hb = _chan(vision, 'vision/heartbeat', default=-1)
-    if hb >= 0:
+    try:
+        hb = int(vision["vision/heartbeat:0"][0])
         td_frame = me.time.frame
         if hb != _last_hb_value:
             _last_hb_value = hb
             _last_hb_frame = td_frame
         hb_alive = 1 if (td_frame - _last_hb_frame) < HB_TIMEOUT_TICKS else 0
-    else:
+    except Exception:
+        hb = -1
         hb_alive = 0
 
-    # ── Puck positions (sketch footprint points) ──────────────────────────────
-    # Detect the OSC channel naming convention ONCE — trying variants per-arg
-    # caused collisions (arg 1 stealing arg 0's channel).
-    _naming = 'colon'
-    try:
-        vision['puck/0:0']
-    except Exception:
-        try:
-            vision['puck/00']
-            _naming = 'flat0'
-        except Exception:
-            try:
-                vision['puck/01']
-                _naming = 'flat1'
-            except Exception:
-                _naming = 'colon'
-
-    def _puck_arg(pid: int, arg_idx: int):
-        if _naming == 'colon':
-            name = f'puck/{pid}:{arg_idx}'
-        elif _naming == 'flat0':
-            name = f'puck/{pid}{arg_idx}'
-        else:  # flat1
-            name = f'puck/{pid}{arg_idx + 1}'
-        try:
-            return vision[name][0]
-        except Exception:
-            return None
-
-    pucks: dict[int, tuple[float, float]] = {}
+    pucks = {}
     for pid in FOOTPRINT_IDS:
-        pf = _puck_arg(pid, 0)
-        if pf is None:
-            continue
         try:
-            pf = int(pf)
-        except Exception:
-            continue
-        if hb < 0 or abs(hb - pf) > LIVENESS_FRAMES:
-            continue
-        px = _puck_arg(pid, 1)
-        py = _puck_arg(pid, 2)
-        if px is None or py is None:
-            continue
-        try:
-            pucks[pid] = (float(px), float(py))
+            pf = int(vision[f"puck/{pid}:0"][0])
+            if hb >= 0 and abs(hb - pf) <= LIVENESS_FRAMES:
+                pucks[pid] = (
+                    float(vision[f"puck/{pid}:1"][0]),
+                    float(vision[f"puck/{pid}:2"][0]),
+                )
         except Exception:
             pass
 
-    # Shoelace area over live puck positions
     area = 0.0
     if len(pucks) >= 3:
-        pts = list(pucks.values())
-        cx  = sum(p[0] for p in pts) / len(pts)
-        cy  = sum(p[1] for p in pts) / len(pts)
-        pts_sorted = sorted(pts, key=lambda p: math.atan2(p[1] - cy, p[0] - cx))
-        area = _shoelace(pts_sorted)
+        points = list(pucks.values())
+        cx = sum(point[0] for point in points) / len(points)
+        cy = sum(point[1] for point in points) / len(points)
+        points = sorted(points, key=lambda point: math.atan2(point[1] - cy, point[0] - cx))
+        area = _shoelace(points)
 
-    # ── Method ID ─────────────────────────────────────────────────────────────
-    # Team decision (2026-05-11): RFID is the SINGLE source of method selection.
-    # vision2's /method/selected (from ArUco token markers 20/21/22) is
-    # intentionally ignored — physical interaction stays RFID-only.
-    method_id = 0
-    rfid = op('rfid_in')
+    method_id = -1
+    try:
+        method_id = int(vision["method/selected:0"][0])
+    except Exception:
+        pass
+
+    rfid = op("rfid_in")
+    if method_id < 0:
+        if rfid is not None:
+            try:
+                method_id = int(rfid["method_id"][0])
+            except Exception:
+                try:
+                    method_id = int(rfid.fetch("method_id", -1))
+                except Exception:
+                    pass
+        if method_id < 0:
+            method_id = 0
+
+    # --- Slider A (HEIGHT) — read from Serial DAT storage ---
+    floor_val = 1
+    slider_raw_val = 0.0
+    slider_alive = 0
     if rfid is not None:
         try:
-            method_id = int(rfid['method_id'][0])
+            floor_val = int(rfid.fetch("floor", 1))
         except Exception:
+            pass
+        try:
+            slider_raw_val = float(rfid.fetch("slider_raw", 0.0))
+        except Exception:
+            pass
+        try:
+            slider_last = int(rfid.fetch("slider_last_frame", -1))
+            if slider_last >= 0 and (me.time.frame - slider_last) < SLIDER_TIMEOUT_TICKS:
+                slider_alive = 1
+        except Exception:
+            pass
+
+    # --- Slider B (BUILDING_PHASE, Manual-Override-Only) — read + TD-side quantization ---
+    global _last_phase_slider_value, _last_phase_index, _last_phase_center, _manual_override_until_frame
+    phase_slider_raw_val = 0.0
+    phase_slider_alive = 0
+    if rfid is not None:
+        try:
+            phase_slider_raw_val = float(rfid.fetch("phase_slider_raw", 0.0))
+        except Exception:
+            pass
+        try:
+            phase_last = int(rfid.fetch("phase_slider_last_frame", -1))
+            if phase_last >= 0 and (me.time.frame - phase_last) < SLIDER_TIMEOUT_TICKS:
+                phase_slider_alive = 1
+        except Exception:
+            pass
+
+    # Per-method n_phases from methods_db Text DAT (inline parse — methods_db is small)
+    n_phases = 5
+    try:
+        db_dat = op("methods_db")
+        if db_dat is not None:
+            database = json.loads(db_dat.text)
+            for method in database.get("methods", []):
+                if int(method.get("id", -1)) == method_id:
+                    n_phases = max(1, int(method.get("n_phases", 5)))
+                    break
+    except Exception:
+        pass
+
+    # Movement detection → MANUAL_OVERRIDE wrapper_state for PHASE_OVERRIDE_FRAMES
+    if _last_phase_slider_value < 0.0:
+        _last_phase_slider_value = phase_slider_raw_val
+        _last_phase_center = 0.0
+        _last_phase_index = 1
+    if abs(phase_slider_raw_val - _last_phase_slider_value) > PHASE_OVERRIDE_THRESHOLD:
+        _manual_override_until_frame = me.time.frame + PHASE_OVERRIDE_FRAMES
+        _last_phase_slider_value = phase_slider_raw_val
+
+    wrapper_state_val = 1 if me.time.frame < _manual_override_until_frame else 0
+
+    # Per-method phase_index quantization with TD-side hysteresis
+    if n_phases <= 1:
+        phase_index_val = 1
+    else:
+        half_step = 1.0 / (2.0 * (n_phases - 1))
+        if abs(phase_slider_raw_val - _last_phase_center) > (half_step + PHASE_HYST_EPSILON):
+            new_index = 1 + int(round(phase_slider_raw_val * (n_phases - 1)))
+            if new_index < 1:
+                new_index = 1
+            if new_index > n_phases:
+                new_index = n_phases
+            _last_phase_index = new_index
+            _last_phase_center = float(new_index - 1) / float(n_phases - 1)
+        phase_index_val = _last_phase_index
+
+    scriptOp["puck_count"][0] = len(pucks)
+    scriptOp["area_px2"][0] = area
+    scriptOp["area_m2"][0] = area * _PX2_TO_M2
+    scriptOp["method_id"][0] = method_id
+    scriptOp["hb_alive"][0] = hb_alive
+    scriptOp["sketch_points"][0] = _int_chan(vision, "sketch/points:0")
+    scriptOp["sketch_walls"][0] = _int_chan(vision, "sketch/walls:0")
+    scriptOp["sketch_windows"][0] = _int_chan(vision, "sketch/windows:0")
+    scriptOp["is_extruded"][0] = _int_chan(vision, "sketch/extruded:0")
+    scriptOp["gesture_id"][0] = _int_chan(vision, "gesture/id:0")
+    scriptOp["gesture_dwell"][0] = _float_chan(vision, "gesture/dwell:0")
+    scriptOp["gesture_action"][0] = _int_chan(vision, "gesture/action:0")
+    scriptOp["fsm_state"][0] = _int_chan(vision, "fsm/state:0")
+
+    # --- Phase 02.1 Slider outputs ---
+    scriptOp["floor"][0] = floor_val
+    scriptOp["slider_raw"][0] = slider_raw_val
+    scriptOp["slider_alive"][0] = slider_alive
+    scriptOp["phase_slider_raw"][0] = phase_slider_raw_val
+    scriptOp["phase_index"][0] = phase_index_val
+    scriptOp["phase_slider_alive"][0] = phase_slider_alive
+    scriptOp["wrapper_state"][0] = wrapper_state_val
+
+    _sync_owner_state(scriptOp, method_id, hb_alive)
+
+
+def _shoelace(points):
+    total = 0.0
+    for index, point in enumerate(points):
+        next_point = points[(index + 1) % len(points)]
+        total += point[0] * next_point[1] - next_point[0] * point[1]
+    return abs(total) / 2.0
+
+
+def _int_chan(op_node, channel, default=0):
+    try:
+        return int(op_node[channel][0])
+    except Exception:
+        return default
+
+
+def _float_chan(op_node, channel, default=0.0):
+    try:
+        return float(op_node[channel][0])
+    except Exception:
+        return default
+
+
+def _sync_owner_state(scriptOp, method_id, hb_alive):
+    global _last_synced_method_id, _last_synced_hb_alive
+
+    owner = scriptOp.parent()
+    method_changed = method_id != _last_synced_method_id
+    hb_changed = hb_alive != _last_synced_hb_alive
+    if not method_changed and not hb_changed:
+        return
+
+    try:
+        owner.store("hb_alive", int(hb_alive))
+    except Exception:
+        pass
+
+    if method_changed:
+        next_state = METHOD_STATE.get(int(method_id), METHOD_STATE[0])
+        for key, value in next_state.items():
             try:
-                method_id = int(rfid.fetch('method_id', 0))
+                owner.store(key, value)
+            except Exception:
+                pass
+        for key, value in (
+            ("floor_control_dirty", 0),
+            ("phase_control_dirty", 0),
+            ("building_part_interacted", 0),
+        ):
+            try:
+                owner.store(key, value)
             except Exception:
                 pass
 
-    # ── Sketch state ──────────────────────────────────────────────────────────
-    sketch_points  = _int_chan(vision, 'sketch/points:0')
-    sketch_walls   = _int_chan(vision, 'sketch/walls:0')
-    sketch_windows = _int_chan(vision, 'sketch/windows:0')
-    is_extruded    = _int_chan(vision, 'sketch/extruded:0')
-
-    # ── Gesture ───────────────────────────────────────────────────────────────
-    gesture_id     = _int_chan(vision,   'gesture/id:0')
-    gesture_dwell  = _float_chan(vision, 'gesture/dwell:0')
-    gesture_action = _int_chan(vision,   'gesture/action:0')
-
-    # ── FSM state ─────────────────────────────────────────────────────────────
-    fsm_state = _int_chan(vision, 'fsm/state:0')
-
-    # ── Write outputs ─────────────────────────────────────────────────────────
-    scriptOp['puck_count'][0]      = len(pucks)
-    scriptOp['area_px2'][0]        = area
-    scriptOp['area_m2'][0]         = area * _PX2_TO_M2
-    scriptOp['method_id'][0]       = method_id
-    scriptOp['hb_alive'][0]        = hb_alive
-
-    scriptOp['sketch_points'][0]   = sketch_points
-    scriptOp['sketch_walls'][0]    = sketch_walls
-    scriptOp['sketch_windows'][0]  = sketch_windows
-    scriptOp['is_extruded'][0]     = is_extruded
-
-    scriptOp['gesture_id'][0]      = gesture_id
-    scriptOp['gesture_dwell'][0]   = gesture_dwell
-    scriptOp['gesture_action'][0]  = gesture_action
-
-    scriptOp['fsm_state'][0]       = fsm_state
-
-
-# ── Helpers ────────────────────────────────────────────────────────────────────
-
-def _shoelace(pts: list) -> float:
-    n = len(pts)
-    a = 0.0
-    for i in range(n):
-        j = (i + 1) % n
-        a += pts[i][0] * pts[j][1] - pts[j][0] * pts[i][1]
-    return abs(a) / 2.0
-
-
-def _chan(op_node, channel: str, default=0):
-    """Read an OSC channel value, tolerant of TD's :0 suffix convention.
-
-    Tries both `name` (single-arg messages) and `name:0` (multi-arg),
-    so the script works regardless of how the OSC In CHOP groups args.
-    """
-    if op_node is None:
-        return default
-    for variant in (channel, f'{channel}:0'):
-        try:
-            return op_node[variant][0]
-        except Exception:
-            pass
-    return default
-
-
-def _int_chan(op_node, channel: str, default: int = 0) -> int:
-    val = _chan(op_node, channel, default)
     try:
-        return int(val)
-    except Exception:
-        return default
+        refresh = owner.op("refresh_metrics_ui")
+        if method_changed and refresh is not None:
+            refresh.module.refresh(owner=owner)
+        elif hb_changed:
+            ui_state = owner.op("ui_state")
+            if ui_state is not None:
+                ui_state.module.compute_and_store_touchdesigner_ui(owner=owner)
+    except Exception as exc:
+        print(f"[vision2_state] owner sync failed: {exc}")
 
-
-def _float_chan(op_node, channel: str, default: float = 0.0) -> float:
-    val = _chan(op_node, channel, default)
-    try:
-        return float(val)
-    except Exception:
-        return default
+    _last_synced_method_id = method_id
+    _last_synced_hb_alive = hb_alive

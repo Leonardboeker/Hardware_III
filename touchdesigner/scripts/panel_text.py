@@ -249,11 +249,16 @@ def bar_bottom_status():
     alive = int(_state('hb_alive', 0))
     pucks = int(_state('puck_count', 0))
     area  = round(_state('area_m2', 0.0), 1)
+    floor = int(_state('floor', 1))
+    phase_index = int(_state('phase_index', 1))
     m     = _method()
     method_name = m.get('name', 'NONE')
+    n_phases = int(m.get('n_phases', 5))
 
     status = 'LIVE' if alive else 'OFFLINE'
     return (f"VISION {status}   ·   "
             f"METHOD {method_name}   ·   "
             f"PUCKS {pucks}   ·   "
-            f"AREA {area} m²")
+            f"AREA {area} m²   ·   "
+            f"FLOOR {floor}   ·   "
+            f"PHASE {phase_index}/{n_phases}")
