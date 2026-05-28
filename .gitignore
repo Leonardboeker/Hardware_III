@@ -45,3 +45,7 @@ node_modules/
 # Large binaries — review before adding (consider Git LFS if >50MB)
 # *.mp4
 # *.mov
+
+# External tooling: TouchDesigner MCP server bundle (downloaded, not source-of-truth)
+touchdesigner/touchdesigner-mcp-td/
+
