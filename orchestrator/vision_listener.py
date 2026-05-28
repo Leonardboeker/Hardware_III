@@ -61,7 +61,23 @@ class VisionListener:
         disp.map("/fsm/state", self._on_fsm)
         disp.set_default_handler(self._on_unknown)
 
-        self._server = osc_server.ThreadingOSCUDPServer((self.host, self.port), disp)
+        try:
+            self._server = osc_server.ThreadingOSCUDPServer((self.host, self.port), disp)
+        except OSError as e:
+            # WinError 10048 = port already in use. Don't crash — the
+            # orchestrator can still run without vision (just shows
+            # VISION OFFLINE / no pucks). Common cause: TD's old
+            # `vision_in` OSC In CHOP still holds the port. Disable it
+            # in TD or stop the other listener, then restart.
+            logger.warning(
+                "VisionListener could not bind %s:%d (%s). "
+                "Continuing WITHOUT vision input — disable TD's vision_in "
+                "OSC In CHOP (or whatever else holds the port) and restart "
+                "to enable vision.",
+                self.host, self.port, e,
+            )
+            self._server = None
+            return
         self._thread = threading.Thread(
             target=self._server.serve_forever, name="VisionListener", daemon=True
         )
