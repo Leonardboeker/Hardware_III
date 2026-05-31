@@ -11,6 +11,7 @@ set HW3_VISION_OSC_PORT=7000
 set HW3_TD_OSC_HOST=127.0.0.1
 set HW3_TD_OSC_PORT=7001
 set HW3_LOG_LEVEL=INFO
+set HW3_RFID_PRIORITY=1
 REM ===============================
 
 cd /d %~dp0..
