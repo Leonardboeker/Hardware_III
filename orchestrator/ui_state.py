@@ -121,7 +121,27 @@ def build_payload(state: State, active_method: Method) -> dict[str, Any]:
         "cost_text":         _cost_text(cost_lo, cost_mid, cost_hi),
         "co2_text":          _co2_text(co2_lo, co2_mid, co2_hi),
         "labor_text":        _labor_text(labor_lo, labor_mid, labor_hi),
+        "phase_cost_text":   _phase_cost_text(active_method, phase_idx, phase_name,
+                                              cost_mid, co2_mid, labor_mid),
     }
+
+
+def _phase_cost_text(method, phase_idx: int, phase_name: str,
+                     cost_mid: float, co2_mid: float, labor_mid: float) -> str:
+    """Per-phase breakdown for right_cost_chart panel — changes with phase_idx."""
+    n = max(1, method.n_phases)
+    # Simple equal split per phase (could become weighted via methods_db later)
+    phase_cost  = cost_mid  / n if cost_mid  > 0 else 0
+    phase_co2   = co2_mid   / n if co2_mid   > 0 else 0
+    phase_labor = labor_mid / n if labor_mid > 0 else 0
+    if cost_mid <= 0:
+        return f"PHASE {phase_idx}/{n}\n{phase_name}\n\nPlace pucks + select method"
+    return (
+        f"PHASE {phase_idx}/{n} · {phase_name}\n\n"
+        f"€ {int(round(phase_cost)):,}".replace(",", ".") + " this phase\n"
+        f"€ {int(round(cost_mid)):,}".replace(",", ".") + " total\n\n"
+        f"~ {int(round(phase_co2)):,} kgCO2e · {int(round(phase_labor)):,} h"
+    ).replace(",", ".")
 
 
 def _cost_text(lo: float, mid: float, hi: float) -> str:
