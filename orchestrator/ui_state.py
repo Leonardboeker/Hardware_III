@@ -30,13 +30,18 @@ def build_payload(state: State, active_method: Method) -> dict[str, Any]:
         else f"Phase {phase_idx}"
     )
 
+    # Re-quantize floor from slider_raw against this method's max_floors.
+    # The firmware always emits FLOOR:1..5 but methods can allow up to 8
+    # (e.g. PREFAB) or as few as 2 (e.g. 3D PRINTED). We override.
+    floor = _quantize_floor(state.slider_raw, active_method.max_floors)
+
     return {
         # ----- Identity -----
         "method_id":         int(state.method_id),
         "method_name":       active_method.name,
 
         # ----- Slider A -----
-        "floor":             int(state.floor),
+        "floor":             floor,
         "max_floors":        int(active_method.max_floors),
         "slider_raw":        round(float(state.slider_raw), 4),
         "slider_alive":      int(_is_fresh(state.slider_last_t)),
@@ -70,15 +75,28 @@ def build_payload(state: State, active_method: Method) -> dict[str, Any]:
     }
 
 
+def _quantize_floor(raw: float, max_floors: int) -> int:
+    """Map slider_raw [0..1] into floor [1..max_floors] using same scheme
+    as PhaseQuantizer. Pure function, no hysteresis (slider noise is
+    smoothed in firmware via median+EMA already)."""
+    n = max(1, int(max_floors))
+    if n <= 1:
+        return 1
+    r = max(0.0, min(1.0, float(raw)))
+    idx = 1 + int(round(r * (n - 1)))
+    return max(1, min(n, idx))
+
+
 def _bar_bottom_text(state: State, method: Method, phase_idx: int, phase_name: str) -> str:
     """Pre-baked status bar string ready to drop into a TD Text TOP."""
     status = "VISION LIVE" if state.hb_alive else "VISION OFFLINE"
+    floor = _quantize_floor(state.slider_raw, method.max_floors)
     return (
         f"{status}   ·   "
         f"METHOD {method.name}   ·   "
         f"PUCKS {state.puck_count}   ·   "
         f"AREA {state.area_m2:.1f} m²   ·   "
-        f"FLOOR {state.floor}/{method.max_floors}   ·   "
+        f"FLOOR {floor}/{method.max_floors}   ·   "
         f"PHASE {phase_idx}/{method.n_phases} ({phase_name})"
     )
 

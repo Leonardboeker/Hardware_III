@@ -59,8 +59,11 @@ def test_phase_index_clamped_to_n_phases():
 
 
 def test_bar_bottom_text_contains_key_info():
+    # floor is derived from slider_raw + active_method.max_floors
+    # MASONRY max_floors=5: raw=0.5 -> floor 3
     state = State(method_id=1, method_name="MASONRY",
-                  floor=3, phase_index=2, puck_count=4, hb_alive=1)
+                  slider_raw=0.5, phase_index=2,
+                  puck_count=4, hb_alive=1)
     payload = build_payload(state, _masonry())
     text = payload["bar_bottom_text"]
     assert "MASONRY" in text
