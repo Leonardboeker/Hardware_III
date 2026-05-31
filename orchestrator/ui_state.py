@@ -123,7 +123,29 @@ def build_payload(state: State, active_method: Method) -> dict[str, Any]:
         "labor_text":        _labor_text(labor_lo, labor_mid, labor_hi),
         "phase_cost_text":   _phase_cost_text(active_method, phase_idx, phase_name,
                                               cost_mid, co2_mid, labor_mid),
+        "current_state_text": _current_state_text(active_method, phase_idx, phase_name,
+                                                  floor, state.puck_count),
+        "current_state_left": _current_state_left(active_method, floor, state.area_m2),
     }
+
+
+def _current_state_text(method, phase_idx: int, phase_name: str,
+                        floor: int, puck_count: int) -> str:
+    """For text_right_phase_preview_state — main right-bottom status panel."""
+    if method.id == 0:
+        return "NO METHOD\nSelect an RFID tag"
+    return f"{method.name}\nPhase {phase_idx}: {phase_name}"
+
+
+def _current_state_left(method, floor: int, area_m2: float) -> str:
+    """For text_right_phase_preview_left — parts/floors summary."""
+    if method.id == 0:
+        return "PARTS\n—\n\nFLOORS\n—"
+    return (
+        f"PARTS\nWhole Building\n\n"
+        f"FLOORS\n{floor}/{method.max_floors}\n\n"
+        f"AREA\n{area_m2:.1f} m²"
+    )
 
 
 def _phase_cost_text(method, phase_idx: int, phase_name: str,
@@ -135,13 +157,14 @@ def _phase_cost_text(method, phase_idx: int, phase_name: str,
     phase_co2   = co2_mid   / n if co2_mid   > 0 else 0
     phase_labor = labor_mid / n if labor_mid > 0 else 0
     if cost_mid <= 0:
-        return f"PHASE {phase_idx}/{n}\n{phase_name}\n\nPlace pucks + select method"
+        return f"PHASE {phase_idx}/{n}: {phase_name}"
+    # Compact 3-line format that fits the small right_cost_chart panel
+    pc = f"{int(round(phase_cost)):,}".replace(",", ".")
+    tc = f"{int(round(cost_mid)):,}".replace(",", ".")
     return (
-        f"PHASE {phase_idx}/{n} · {phase_name}\n\n"
-        f"€ {int(round(phase_cost)):,}".replace(",", ".") + " this phase\n"
-        f"€ {int(round(cost_mid)):,}".replace(",", ".") + " total\n\n"
-        f"~ {int(round(phase_co2)):,} kgCO2e · {int(round(phase_labor)):,} h"
-    ).replace(",", ".")
+        f"PHASE {phase_idx}/{n}: {phase_name}\n"
+        f"€ {pc} this phase · € {tc} total"
+    )
 
 
 def _cost_text(lo: float, mid: float, hi: float) -> str:
