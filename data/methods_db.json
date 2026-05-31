@@ -63,7 +63,7 @@
     {
       "id": 2,
       "name": "3D PRINTED",
-      "rfid_tag": "04003001F85713",
+      "rfid_tag": "04500701235713",
       "color_rgb": [0.18, 0.62, 0.85],
       "min_pucks": 2,
       "max_pucks": 10,
@@ -86,7 +86,7 @@
     {
       "id": 3,
       "name": "PREFAB",
-      "rfid_tag": "045033011E5713",
+      "rfid_tag": "04003001F85713",
       "color_rgb": [0.25, 0.72, 0.45],
       "min_pucks": 2,
       "max_pucks": 10,
