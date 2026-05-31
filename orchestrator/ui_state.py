@@ -48,6 +48,23 @@ def build_payload(state: State, active_method: Method) -> dict[str, Any]:
     labor_lo, labor_mid, labor_hi = _scale_estimate(
         active_method.extras.get("labor_hours_range"), area, floor)
 
+    # ----- Puck/sketch-point coordinates for TD render -----
+    # vision script maps sketch.points[0..9] -> /puck/{idx} in projector
+    # 1280x720 coords. We forward each puck_i_x/y so TD can draw circles + lines.
+    # Coords get normalized to [0..1] for easier UV mapping.
+    puck_xy = {}
+    PROJ_W, PROJ_H = 1280.0, 720.0
+    for i in range(10):
+        obs = state.pucks.get(i)
+        if obs is not None:
+            puck_xy[f"puck_{i}_x"] = round(obs.x / PROJ_W, 4)
+            puck_xy[f"puck_{i}_y"] = round(obs.y / PROJ_H, 4)
+            puck_xy[f"puck_{i}_active"] = 1
+        else:
+            puck_xy[f"puck_{i}_x"] = 0.0
+            puck_xy[f"puck_{i}_y"] = 0.0
+            puck_xy[f"puck_{i}_active"] = 0
+
     return {
         # ----- Identity -----
         "method_id":         int(state.method_id),
@@ -94,6 +111,9 @@ def build_payload(state: State, active_method: Method) -> dict[str, Any]:
         "labor_low":         round(labor_lo, 0),
         "labor_mid":         round(labor_mid, 0),
         "labor_high":        round(labor_hi, 0),
+
+        # ----- Puck / sketch-point coords (normalized 0..1) for TD render -----
+        **puck_xy,
 
         # ----- Convenience pre-formatted strings (so TD doesn't have to compute them) -----
         "status_label":      "VISION LIVE" if state.hb_alive else "VISION OFFLINE",
