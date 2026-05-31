@@ -116,7 +116,12 @@ def main() -> int:
                 if (now_t - obs.last_seen_t) < config.SLIDER_TIMEOUT_S
             }
             puck_count = len(alive_pucks)
-            area_m2 = _shoelace_area([(p.x, p.y) for p in alive_pucks.values()])
+            # Prefer vision-provided area (from /sketch/area_m2) when vision is alive.
+            # Fall back to computed shoelace area from puck polygon otherwise.
+            if hb_alive and snap.area_m2 > 0.0:
+                area_m2 = snap.area_m2
+            else:
+                area_m2 = _shoelace_area([(p.x, p.y) for p in alive_pucks.values()])
 
             # ----- Write derived back into state -----
             def _derive(s):

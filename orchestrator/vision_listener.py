@@ -58,7 +58,7 @@ class VisionListener:
         disp.map("/method/selected", self._on_method_selected)
         disp.map("/sketch/*", self._on_sketch)
         disp.map("/gesture/*", self._on_gesture)
-        disp.map("/fsm/state", self._on_fsm)
+        disp.map("/fsm/*", self._on_fsm)
         disp.set_default_handler(self._on_unknown)
 
         try:
@@ -179,19 +179,26 @@ class VisionListener:
         if not args:
             return
         tail = addr.rsplit("/", 1)[1]
-        try:
-            val = int(args[0])
-        except (TypeError, ValueError):
-            return
+        raw = args[0]
         def _w(s):
             if tail == "points":
-                s.sketch_points = val
+                try: s.sketch_points = int(raw)
+                except (TypeError, ValueError): pass
             elif tail == "walls":
-                s.sketch_walls = val
+                try: s.sketch_walls = int(raw)
+                except (TypeError, ValueError): pass
             elif tail == "windows":
-                s.sketch_windows = val
-            elif tail == "extruded":
-                s.is_extruded = val
+                try: s.sketch_windows = int(raw)
+                except (TypeError, ValueError): pass
+            elif tail in ("extruded", "is_extruded"):
+                try: s.is_extruded = int(raw)
+                except (TypeError, ValueError): pass
+            elif tail == "area_m2":
+                try: s.area_m2 = float(raw)
+                except (TypeError, ValueError): pass
+            elif tail == "perim_m":
+                try: s.sketch_perim_m = float(raw)
+                except (TypeError, ValueError): pass
         self.sm.write(_w)
 
     def _on_gesture(self, addr: str, *args) -> None:
@@ -214,12 +221,17 @@ class VisionListener:
     def _on_fsm(self, addr: str, *args) -> None:
         if not args:
             return
-        try:
-            val = int(args[0])
-        except (TypeError, ValueError):
-            return
+        tail = addr.rsplit("/", 1)[1]
+        raw = args[0]
         def _w(s):
-            s.fsm_state = val
+            if tail == "state":
+                try: s.fsm_state = int(raw)
+                except (TypeError, ValueError): pass
+            elif tail == "state_name":
+                if isinstance(raw, str):
+                    s.fsm_state_name = raw
+                else:
+                    s.fsm_state_name = str(raw)
         self.sm.write(_w)
 
     def _on_unknown(self, addr: str, *args) -> None:

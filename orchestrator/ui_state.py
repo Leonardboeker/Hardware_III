@@ -63,11 +63,13 @@ def build_payload(state: State, active_method: Method) -> dict[str, Any]:
         "sketch_points":     int(state.sketch_points),
         "sketch_walls":      int(state.sketch_walls),
         "sketch_windows":    int(state.sketch_windows),
+        "sketch_perim_m":    round(float(state.sketch_perim_m), 2),
         "is_extruded":       int(state.is_extruded),
         "gesture_id":        int(state.gesture_id),
         "gesture_dwell":     round(float(state.gesture_dwell), 3),
         "gesture_action":    int(state.gesture_action),
         "fsm_state":         int(state.fsm_state),
+        "fsm_state_name":    state.fsm_state_name,
 
         # ----- Convenience pre-formatted strings (so TD doesn't have to compute them) -----
         "status_label":      "VISION LIVE" if state.hb_alive else "VISION OFFLINE",

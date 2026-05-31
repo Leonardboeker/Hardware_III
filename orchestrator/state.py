@@ -56,11 +56,13 @@ class State:
     sketch_points: int = 0
     sketch_walls: int = 0
     sketch_windows: int = 0
+    sketch_perim_m: float = 0.0
     is_extruded: int = 0
     gesture_id: int = 0
     gesture_dwell: float = 0.0
     gesture_action: int = 0
     fsm_state: int = 0
+    fsm_state_name: str = ""
     vision_method_id: int = -1         # if vision sends /method/selected; -1 = unused
 
     # ----- Bookkeeping -----
